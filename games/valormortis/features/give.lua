@@ -133,8 +133,9 @@ function Give.Catalog()
     return catalog
 end
 
--- A give is checked again a moment later: the game may refuse items silently (an item at its carry
--- limit), and the count it reports can lag behind. The status says what really changed.
+-- A give is checked again a moment later and the status says what really changed: past what
+-- William can carry, the game puts the rest in his storage (confirmed in game), so the count he
+-- carries can stay the same.
 local VERIFY_AFTER = 1
 local pendingGive = nil   -- { entry, amount, countBefore, checkAt }
 
@@ -147,7 +148,8 @@ local function reportGive(give)
     elseif countAfter > before then
         App.status = string.format("%s: %d -> %d", label, before, countAfter)
     else
-        App.status = string.format("%s: still %d (the game took no more)", label, countAfter)
+        -- past what William can carry, the game puts the rest in his storage
+        App.status = string.format("%s: you carry the most (%d); the rest went to storage", label, countAfter)
     end
 end
 

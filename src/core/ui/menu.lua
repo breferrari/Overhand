@@ -3,7 +3,7 @@
 --
 --   header       the mod's mark, title, a rule and the game's name; the tabs, each with how many of
 --                its rows differ from vanilla
---   rows         toggles (OFF | ON), choices (◂ value ▸), lists (a choice that opens a dropdown),
+--   rows         toggles (OFF | ON), choices (◂ value ▸), lists (value ▾, opens a dropdown),
 --                actions, section titles, sub-rows; a mark on every row changed from vanilla, the
 --                selected row lit with an edge bar
 --   description  what the selected row does
@@ -46,6 +46,7 @@ local CONTROL_WIDTH = 124      -- toggles and choices line up on the right
 local VALUE_WIDTH = 88         -- a choice's value between its arrows
 local LIST_VALUE_MAX_WIDTH = 200   -- a list's value (item names are long) is cut off past this
 local LIST_ROWS = 7            -- options shown at once in an open dropdown
+local PAGE_MAX_HEIGHT = 600    -- the rows area scrolls past this (the menu fits a 1080p screen)
 local MARK_SIZE = 26
 local ARROW_WIDTH, ARROW_HEIGHT = 5, 7
 local CORNER_LENGTH, CORNER_THICKNESS = 12, 2
@@ -300,7 +301,7 @@ local function changeValue(direction)
     if not item then return end
     if item.kind == "toggle" then
         item.set(not item.get())
-    elseif item.kind == "choice" then
+    elseif item.kind == "choice" and not item.list then   -- a list is chosen from its dropdown
         local options = optionsOf(item)
         if #options == 0 then return end
         local index = (currentIndex(item, options) or 0) + direction
@@ -333,6 +334,7 @@ end
 
 local function activate()
     local item = selected()
+    Log.Limited("menu enter", 50, "menu: enter on " .. (item and (item.label .. " (" .. item.kind .. ")") or "nothing"))
     if not item then return end
     if item.kind == "toggle" then
         changeValue(1)
@@ -396,13 +398,22 @@ local function buildArrow(tree, name, image, fallback)
         or Widgets.Text(tree, name, fallback, FONT_SIZE.arrow, COLORS.faint)
 end
 
--- ◂ value ▸ (a list's long names are cut off).
+-- ◂ value ▸, or for a list: value ▾ (it is chosen from its dropdown; long names are cut off).
 local function buildChoice(tree, name, item)
     local line = Widgets.HorizontalBox(tree, name .. "Choice")
-    local valueBox = Widgets.SizeBox(tree, name .. "ValueBox", nil, nil, VALUE_WIDTH)
+    local valueBox = Widgets.SizeBox(tree, name .. "ValueBox", nil, nil, not item.list and VALUE_WIDTH or nil)
     if item.list then try(function() valueBox:SetMaxDesiredWidth(LIST_VALUE_MAX_WIDTH) end) end
-    local value = Widgets.Text(tree, name .. "Value", "", FONT_SIZE.row, COLORS.title, { center = true, ellipsis = item.list })
+    local value = Widgets.Text(tree, name .. "Value", "", FONT_SIZE.row, COLORS.title, { center = not item.list, ellipsis = item.list })
     valueBox:SetContent(value)
+    if item.list then
+        addCentered(line, valueBox, 0, 8)
+        local chevron = buildArrow(tree, name .. "Open", "arrowRight", "v")
+        try(function() chevron:SetRenderTransformAngle(90.0) end)   -- the right arrow turned down
+        addCentered(line, chevron)
+        local box = Widgets.SizeBox(tree, name .. "ChoiceBox", nil, nil, CONTROL_WIDTH)
+        Widgets.Align(box:SetContent(line), END, CENTER)   -- against the right edge, like the other controls
+        return box, { value = value }
+    end
     addCentered(line, buildArrow(tree, name .. "Left", "arrowLeft", "‹"))
     addCentered(line, valueBox, 8, 8)
     addCentered(line, buildArrow(tree, name .. "Right", "arrowRight", "›"))
@@ -498,7 +509,7 @@ local function buildSection(tree, page, name, title, isFirst)
     Widgets.Pad(page:AddChild(line), SIDE_PADDING, isFirst and 4 or 16, SIDE_PADDING, 6)
 end
 
-local function buildPage(tree, column, tabIndex, tab)
+local function buildPage(tree, container, tabIndex, tab)
     local page = Widgets.VerticalBox(tree, "Page" .. tabIndex)
     local rows = {}
     for index, item in ipairs(tab.items) do
@@ -513,7 +524,7 @@ local function buildPage(tree, column, tabIndex, tab)
             rows[index] = buildRow(tree, page, name, item)
         end
     end
-    Widgets.Pad(column:AddChild(page), 0, 12, 0, 12)
+    Widgets.Pad(container:AddChild(page), 0, 12, 0, 12)
     Widgets.SetVisible(page, false)
     return { box = page, rows = rows }
 end
@@ -692,7 +703,16 @@ local function build(controller)
 
     local tabWidgets, title = buildHeader(tree, column)
     local pages = {}
-    for index, tab in ipairs(tabs) do pages[index] = buildPage(tree, column, index, tab) end
+    -- the rows scroll (the selection is kept in view) when a tab is taller than PAGE_MAX_HEIGHT
+    local scroll = Widgets.Construct("/Script/UMG.ScrollBox", tree, "PagesScroll")
+    try(function() scroll:SetScrollBarVisibility(1) end)   -- collapsed: the selection drives it
+    local pagesBox = Widgets.VerticalBox(tree, "Pages")
+    scroll:AddChild(pagesBox)
+    local scrollLimit = Widgets.SizeBox(tree, "PagesLimit")
+    try(function() scrollLimit:SetMaxDesiredHeight(PAGE_MAX_HEIGHT) end)
+    scrollLimit:SetContent(scroll)
+    column:AddChild(scrollLimit)
+    for index, tab in ipairs(tabs) do pages[index] = buildPage(tree, pagesBox, index, tab) end
     local description = buildDescription(tree, column)
     local footer = buildFooter(tree, column)
 
@@ -713,7 +733,7 @@ local function build(controller)
         return build(controller)
     end
     view.widgets = {
-        root = root, frame = frame, frameSlot = frameSlot, tabs = tabWidgets, pages = pages,
+        root = root, frame = frame, frameSlot = frameSlot, tabs = tabWidgets, pages = pages, scroll = scroll,
         description = description, footer = footer,
     }
     view.shownTabIndex = nil
@@ -888,7 +908,7 @@ local function hintText(verb, item)
         if item.kind == "toggle" then return "toggle" end
         if item.kind == "choice" and item.list then return "list" end
         if item.kind == "action" then return view.pendingConfirm == item and "confirm" or "use" end
-    elseif verb == "change" and isStepped(item) then
+    elseif verb == "change" and isStepped(item) and not item.list then
         return "change"
     end
     return nil
@@ -909,6 +929,21 @@ local function drawFooter(item)
     end
 end
 
+-- Scrolls the rows so the selected row, or the open dropdown's highlighted line, is visible (only
+-- when that target changes).
+local function keepInView(page, selectedIndex)
+    local rowWidgets = selectedIndex and page.rows[selectedIndex]
+    if not rowWidgets then return end
+    local target = rowWidgets.border
+    if view.list and rowWidgets.list then
+        local line = rowWidgets.list.lines[view.list.highlighted - view.list.first + 1]
+        target = line and line.border or rowWidgets.list.box
+    end
+    if changed(view.shown, "scrollTarget", target) then
+        try(function() view.widgets.scroll:ScrollWidgetIntoView(target, false) end)
+    end
+end
+
 local function refresh()
     local widgets = view.widgets
     if not widgets then return end
@@ -923,6 +958,7 @@ local function refresh()
             drawRow(rowWidgets, item, index == selectedIndex)
         end
     end
+    keepInView(page, selectedIndex)
     drawTabCounts()
     drawDescription(selectedItem)
     drawFooter(selectedItem)

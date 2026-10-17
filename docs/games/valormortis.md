@@ -77,7 +77,7 @@ Valor Mortis uses the Gameplay Ability System. `BaseValue` is saved with the gam
 - `InventorySubsystem.InventoryDatabaseAsset`: maps `ConsumableItemsMap`, `MaterialItemsMap`, `InstantItemsMap`, `NarrativeItemsMap` (quest items; Give Item's Quest Items category, with the tags in `QuestAction_GrantItems` / `QuestAction_RemoveItems` `ItemTags`). Each maps a category tag to an `ItemMap` of real items. 34 consumables, 14 materials, 7 instant items (**confirmed in game**). In-game names in `UIData.TextStats`.
 - `SaveSubsystem:TryGetInventoryItemCount(tag)`, `InventorySubsystem:AddInventoryItem(tag, amount)`, `InventorySubsystem:TrySetAllConsumableInventoryItemsCooldown(player, 0)`.
 - "Use item" functions are called from C++, so hooking them does not work; Infinite Consumables polls counts and gives back what was used.
-- Give Item: `AddInventoryItem` can return without adding (both early tests: a coating already at 3 stayed at 3), so Overhand reads the count again a second later and reports what changed. Whether that was a carry limit or a lagging count is still to find out.
+- Give Item: items past what William can carry go to his storage (**confirmed in game**: a coating at 3 stayed at 3, the rest could be picked up from storage). `TryGetInventoryItemCount` counts what he carries; Overhand reads it again a second after giving and says where the items went.
 - Death: the character's `DeathmarkRef:ForcePickup()` returns the dropped catalysts; `bRespawning` while respawning. Some deaths (poison, some bosses) leave no deathmark and still take the catalysts; `MTCombatUtils:AddExperiencePointsToPlayer(n)` gives catalysts.
 
 ## Weapons, progression and quests
