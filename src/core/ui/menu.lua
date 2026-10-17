@@ -932,6 +932,7 @@ local function drawDescription(item)
     local listOpen = view.list ~= nil
     setVisible(shown, "bodyVisible", description.bodyBox, not listOpen)
     if changed(shown, "pickerVisible", listOpen) then
+        Log.Debug("menu: list panel " .. (listOpen and "shown" or "hidden"))
         Widgets.SetVisible(description.picker.box, listOpen)
         -- Showing a widget that started hidden did not always repaint it: the list opened (the log
         -- said so) but showed only after the next change. So its layout is invalidated now and
@@ -1100,12 +1101,15 @@ local function handleCommand(command)
     end
     if not view.open then return end
     if command ~= "enter" then view.pendingConfirm = nil end
+    local listBefore = view.list ~= nil
     if view.list and LIST_COMMANDS[command] then
         LIST_COMMANDS[command]()
     else
         view.list = nil
         COMMANDS[command]()
     end
+    Log.Debug(string.format("menu: %s (%s), list %s -> %s", command, view.withController and "controller" or "keyboard",
+        listBefore and "open" or "closed", view.list and "open" or "closed"))
     if view.open then refresh() end
 end
 
