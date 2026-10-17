@@ -164,16 +164,26 @@ end
 -- Is a key or controller button held on this player controller? keyName is an Unreal FKey name
 -- ("SpaceBar", "Gamepad_FaceButton_Bottom", ...); the key struct is built once per name.
 local keyStructs = {}
-local function isInputKeyDown(controller, key) return controller:IsInputKeyDown(key) end
-
-function Unreal.IsKeyDown(controller, keyName)
-    if not controller then return false end
+local function keyStruct(keyName)
     local key = keyStructs[keyName]
     if not key then
         key = { KeyName = FName(keyName) }
         keyStructs[keyName] = key
     end
-    return Unreal.Try(isInputKeyDown, controller, key) == true
+    return key
+end
+local function isInputKeyDown(controller, key) return controller:IsInputKeyDown(key) end
+local function wasInputKeyJustReleased(controller, key) return controller:WasInputKeyJustReleased(key) end
+
+function Unreal.IsKeyDown(controller, keyName)
+    if not controller then return false end
+    return Unreal.Try(isInputKeyDown, controller, keyStruct(keyName)) == true
+end
+
+-- True for one frame after the key was released (also when its press never reached the controller).
+function Unreal.WasKeyJustReleased(controller, keyName)
+    if not controller then return false end
+    return Unreal.Try(wasInputKeyJustReleased, controller, keyStruct(keyName)) == true
 end
 
 -- Engine function libraries every Unreal game has.

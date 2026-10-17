@@ -84,8 +84,13 @@ def run_mod(mod: pathlib.Path, manifest: dict, walk_menu: bool = True) -> list[s
     lua.execute(f'dofile("{scripts}/main.lua")')
     advance_clock = lua.eval("function(seconds) local clock = os.clock; os.clock = function() return clock() + seconds end end")
 
+    def frame():
+        if mock.frameLoop:
+            mock.frameLoop()
+
     def tick(times=1):
         for _ in range(times):
+            frame()
             mock.loop()
 
     def press(key):
@@ -98,7 +103,24 @@ def run_mod(mod: pathlib.Path, manifest: dict, walk_menu: bool = True) -> list[s
         tick(ticks)
         for button in buttons:
             mock.keysDown[button] = None
+            mock.keysJustReleased[button] = True
         tick()
+        for button in buttons:
+            mock.keysJustReleased[button] = None
+        tick()
+
+    # A button whose press never reached the controller, only its release (the game's CommonUI
+    # takes the first A after the menu opens): the engine flags it as released for one frame.
+    def release_only(button):
+        mock.keysJustReleased[button] = True
+        frame()
+        mock.keysJustReleased[button] = None
+        tick()
+
+    def log_text():
+        return (mod / (manifest["modName"] + ".log")).read_text(encoding="utf-8")
+
+    problems = []
 
     # Main menu: no player controller yet.
     tick(5)
@@ -123,6 +145,16 @@ def run_mod(mod: pathlib.Path, manifest: dict, walk_menu: bool = True) -> list[s
         press("ESCAPE")
         # Controller: L3 + R3 opens, D-pad / A / LB / RB navigate (D-pad held repeats), B closes.
         hold("Gamepad_LeftThumbstick", "Gamepad_RightThumbstick")
+        # The first A after opening arrives only as a release; it must still act, once. A normal
+        # press then acts once too (its release flag must not count a second time).
+        release_only("Gamepad_FaceButton_Bottom")
+        enters = log_text().count("controller: enter")
+        if enters != 1:
+            problems.append(f"an A seen only as a release: expected 1 'controller: enter', got {enters}")
+        hold("Gamepad_FaceButton_Bottom")
+        enters = log_text().count("controller: enter")
+        if enters != 2:
+            problems.append(f"an A press after it: expected 2 'controller: enter' in total, got {enters}")
         for button in ("Gamepad_DPad_Down", "Gamepad_DPad_Right", "Gamepad_FaceButton_Bottom",
                        "Gamepad_RightShoulder", "Gamepad_LeftShoulder"):
             hold(button)
@@ -135,8 +167,8 @@ def run_mod(mod: pathlib.Path, manifest: dict, walk_menu: bool = True) -> list[s
     mock.loadMap()
     tick(5)
 
-    log = (mod / (manifest["modName"] + ".log")).read_text(encoding="utf-8")
-    problems = [line for line in log.splitlines() if "ERROR" in line]
+    log = log_text()
+    problems += [line for line in log.splitlines() if "ERROR" in line]
     undefined = sorted({str(mock.undefinedGlobals[i]) for i in range(1, len(mock.undefinedGlobals) + 1)})
     if undefined:
         problems.append("undefined globals read: " + ", ".join(undefined))

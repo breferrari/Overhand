@@ -109,6 +109,8 @@ From Valor Mortis Cheat Menu 1.4.0's findings (BryanHudson), reimplemented; **no
 - Toggle sprint: `GA_Sprint_C.bGamepadInput` makes sprint a toggle (the gamepad behaviour) for the keyboard too.
 - Controller buttons via `PlayerController:IsInputKeyDown` with FKey names (`Gamepad_LeftThumbstick` for L3 **confirmed in game**).
 - **UI-only input mode stops controller buttons from reaching the game** (and so `IsInputKeyDown`), **confirmed in game**. A controller-opened menu uses game-and-UI mode.
+- The game uses **CommonUI**: the viewport client is `CommonGameViewportClient` and its action router is `MTUIActionRouterBase`, **confirmed in game**. `WBP_PayOff_C` and `WBP_Dialogue_C` stay activated (hidden) during normal play.
+- **The first A after our menu opens reaches the player controller only as a release**, **confirmed in game** (2026-10-17): `IsInputKeyDown` never turns true for that press, but `WasInputKeyJustReleased` is true for one frame. Later A presses arrive normally, and other buttons (RB, D-pad) are never affected. Nothing hookable runs on that press (no `UserWidget` key or focus event, no CommonUI button, no input-mode change), so the press is taken natively, most likely by CommonUI as Accept. The menu acts on A's release and counts a release whose press it never saw, checked every frame (`Input.WatchReleases`); **fix confirmed in game**.
 
 ## Other mods for this game
 

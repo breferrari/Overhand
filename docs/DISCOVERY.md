@@ -103,6 +103,7 @@ end)
 |---|---|---|
 | `FindAllOf` on a timer | The Cheat Menu searched every object ~130 times a second while its menu was open: stutter. | Cached lookups; search on button presses only. |
 | UI-only input mode with a controller | The game stopped processing controller buttons, so the mod could not read them. | Game-and-UI mode when opened with the controller (`core/ui/input.lua`). |
+| A key press that arrives only as its release | In Valor Mortis the first A after the menu opened never showed as down in `IsInputKeyDown` (CommonUI took the press); several fixes changed how the press was read and missed it, because the log only had whole seconds and no release flag. | Log every key edge with `WasInputKeyJustReleased` and millisecond times before changing input code; act on releases, checked every frame (`Input.WatchReleases`). |
 | `LoopAsync` | Async loops next to game-thread hooks corrupted the Lua state (random crashes, per the Cheat Menu's notes). | One `LoopInGameThreadWithDelay` loop. |
 | Our value taken for vanilla | A saved attribute changed by a cheat came back after a load looking like the game's own value. | Saved values go through the ledger (`core/ledger.lua`). |
 | Resetting state that outlives the world | Re-reading a game asset's "original" values after a map change would have read our scaled ones. | Track assets by address instead of resetting them (`features/health.lua`, fall curve). |

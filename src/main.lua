@@ -9,6 +9,7 @@ local Log = require("core.log")
 local Settings = require("core.settings")
 local Runner = require("core.runner")
 local Menu = require("core.ui.menu")
+local Input = require("core.ui.input")
 
 Log.StartSession()
 Settings.Load()
@@ -26,5 +27,14 @@ ModTick = function()
     Log.Guarded("save settings", Settings.SaveIfDirty)
 end
 ModTickHandle = LoopInGameThreadWithDelay(33, ModTick)
+
+-- The controller's A is also watched every frame (while the menu is open): see Input.WatchReleases.
+if rawget(_G, "EngineTickAvailable") == true and rawget(_G, "LoopInGameThreadAfterFrames") then
+    ModFrame = function() Log.Guarded("watch releases", Input.WatchReleases) end
+    ModFrameHandle = LoopInGameThreadAfterFrames(1, ModFrame)
+    Log.Info("controller releases watched every frame")
+else
+    Log.Info("no per-frame loop (UE4SS EngineTick hook unavailable): controller releases are checked every 33 ms")
+end
 
 Log.Info("loaded, press F5 or L3 + R3 in game")

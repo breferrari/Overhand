@@ -13,6 +13,7 @@ New (following Valor Mortis Cheat Menu 1.4.0's findings, reimplemented the Overh
 - **Quests** tab (read only): your active quests and what the current step asks for, and *Write quest report* (`Overhand-Quests.txt`: the quests' structure by reflection, to build a quest helper that knows which items a step needs).
 
 Fixes:
+- **The controller's first A after opening the menu did nothing.** The cause is confirmed in game: the game's CommonUI takes that press, and only its release reaches the player controller. A now acts on its release, counted even when the press never showed, and is watched every frame while the menu is open (**fix confirmed in game**).
 - **Instant Sprint** only on the ground (in the air it steered away the momentum of jumps and swings).
 - **The first open of a dropdown showed nothing** (it opened, but a widget built hidden is drawn with no size the first time): the dropdowns get one layout pass at build.
 - **Give Item** checks the count a second later and says what changed ("Sharp Coating: 3 -> 8", or "you carry the most (3); the rest went to storage") instead of a blind "Added".

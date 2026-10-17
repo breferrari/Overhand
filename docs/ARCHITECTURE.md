@@ -53,7 +53,7 @@ src/core/
 3. registers its features and once-per-world checks with the runner, and its bug report section,
 4. builds the menu content (`Sheet.Build` → `Menu.AddTab`).
 
-Then `main.lua` starts the log, loads the settings, binds the keys and starts one game-thread loop (every 33 ms): `Menu.Tick`, `Runner.Tick`, `Settings.SaveIfDirty`.
+Then `main.lua` starts the log, loads the settings, binds the keys and starts one game-thread loop (every 33 ms): `Menu.Tick`, `Runner.Tick`, `Settings.SaveIfDirty`. When UE4SS has its EngineTick hook, a second game-thread loop runs every frame and only calls `Input.WatchReleases` (two key reads while the menu is open, nothing otherwise): a controller release can be visible for one frame only.
 
 ## src/core/
 
@@ -107,7 +107,7 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 
 ## Rules
 
-1. **Game thread only.** One loop (`LoopInGameThreadWithDelay`) runs the menu and the features. Key callbacks only queue a command; hooks only touch their parameters. No `LoopAsync`.
+1. **Game thread only.** One loop (`LoopInGameThreadWithDelay`) runs the menu and the features; the only other loop is the per-frame release watch (`LoopInGameThreadAfterFrames`, also the game thread). Key callbacks only queue a command; hooks only touch their parameters. No `LoopAsync`.
 2. **No per-tick searches.** `FindAllOf` walks every object in the game. Look objects up through `Unreal.FindCached` / `FindAllCached` / `FindRanked` (or the game's helpers built on them), which keep what they found and wait before searching again. Searching on a button press is fine. See [PERFORMANCE.md](PERFORMANCE.md).
 3. **Off means vanilla.** A cheat that is switched off must leave the game as it found it. Use `Override` for any value the game also writes; saved values go through a saved accessor (ledger).
 4. **Everything is guarded.** Unreal calls go through `Unreal.Try`; features and checks run under `Log.Guarded`, so one broken cheat never stops the loop.

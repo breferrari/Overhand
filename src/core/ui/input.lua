@@ -48,8 +48,9 @@ local MENU_BUTTONS = {
     { key = "Gamepad_DPad_Down", command = "down", repeats = true },
     { key = "Gamepad_DPad_Left", command = "left", repeats = true },
     { key = "Gamepad_DPad_Right", command = "right", repeats = true },
-    -- A acts when released: acting while it was held showed the result one press late, the first
-    -- time after the menu opened (the game also gets A in game-and-UI mode).
+    -- A acts when released, and a release counts even when its press was never seen: the first A
+    -- after the menu opens reaches the player controller only as a release (the game's CommonUI
+    -- takes the press as Accept; confirmed in Valor Mortis).
     { key = "Gamepad_FaceButton_Bottom", command = "enter", onRelease = true },
     { key = "Gamepad_FaceButton_Right", command = "close" },
     { key = "Gamepad_LeftShoulder", command = "previousTab" },
@@ -58,12 +59,44 @@ local MENU_BUTTONS = {
 local REPEAT_DELAY, REPEAT_INTERVAL = 0.4, 0.12
 
 local toggleHeld = false
-local held = {}            -- button key -> clock time of its next repeat (while held)
+local held = {}            -- button key -> clock time of its next repeat (while held); true for onRelease buttons
+local releaseSeen = {}     -- onRelease button key -> its "just released" flag was already acted on
+local watchedEveryFrame = false   -- Input.WatchReleases runs every frame: the tick leaves onRelease buttons to it
+local menuOpenNow = false         -- as last told by PollController
 
 -- Logs the first controller commands, so a test shows whether presses reach us.
 local function queueFromController(command)
     Log.Limited("controller", 20, "controller: " .. command)
     queue(command)
+end
+
+-- An onRelease button: acts on the release seen as down -> up, or on the controller's one-frame
+-- "just released" flag when the press never showed as down.
+local function checkRelease(controller, button)
+    local down = Unreal.IsKeyDown(controller, button.key)
+    local released = Unreal.WasKeyJustReleased(controller, button.key)
+    local freshRelease = released and not releaseSeen[button.key]
+    releaseSeen[button.key] = released or nil
+    if down then
+        held[button.key] = true
+        return
+    end
+    if held[button.key] or freshRelease then
+        if not held[button.key] then Log.Limited("release only", 5, "controller: " .. button.key .. " released, its press never reached the controller") end
+        queueFromController(button.command)
+    end
+    held[button.key] = nil
+end
+
+-- Every frame while the menu is open (main.lua, when UE4SS has a per-frame loop): the "just released"
+-- flag lasts one frame, so the 33 ms tick alone would miss most releases whose press was taken.
+function Input.WatchReleases()
+    watchedEveryFrame = true
+    if not menuOpenNow then return end
+    local controller = config.controller()
+    for _, button in ipairs(MENU_BUTTONS) do
+        if button.onRelease then checkRelease(controller, button) end
+    end
 end
 
 function Input.PollController(menuOpen)
@@ -72,17 +105,16 @@ function Input.PollController(menuOpen)
     local toggleDown = Unreal.IsKeyDown(controller, TOGGLE_BUTTONS[1]) and Unreal.IsKeyDown(controller, TOGGLE_BUTTONS[2])
     if toggleDown and not toggleHeld then queueFromController("toggleWithController") end
     toggleHeld = toggleDown
+    menuOpenNow = menuOpen
     if not menuOpen then
-        held = {}
+        held, releaseSeen = {}, {}
         return
     end
     local now = os.clock()
     for _, button in ipairs(MENU_BUTTONS) do
-        local down = Unreal.IsKeyDown(controller, button.key)
         if button.onRelease then
-            if not down and held[button.key] then queueFromController(button.command) end
-            held[button.key] = down or nil
-        elseif down then
+            if not watchedEveryFrame then checkRelease(controller, button) end
+        elseif Unreal.IsKeyDown(controller, button.key) then
             local nextRepeatAt = held[button.key]
             if not nextRepeatAt then
                 queueFromController(button.command)

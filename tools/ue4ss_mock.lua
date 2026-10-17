@@ -30,6 +30,7 @@ local function newMock(className)
         K2_GetActorLocation = function() return { X = 100.0, Y = 200.0, Z = 300.0 } end,
         GetControlRotation = function() return { Pitch = 0.0, Yaw = 90.0, Roll = 0.0 } end,
         IsInputKeyDown = function(key) return Mock.keysDown[key.KeyName:ToString()] == true end,
+        WasInputKeyJustReleased = function(key) return Mock.keysJustReleased[key.KeyName:ToString()] == true end,
     }
     setmetatable(mock, {
         __index = function(_, key)
@@ -53,6 +54,7 @@ Mock.worldReady = false   -- false: main menu (no player controller found)
 
 Mock.keyBinds = {}
 Mock.keysDown = {}   -- controller buttons held, by FKey name
+Mock.keysJustReleased = {}   -- controller buttons released this frame (the engine's one-frame flag)
 Mock.loop = nil
 Mock.printed = {}
 
@@ -72,6 +74,8 @@ function RegisterKeyBind(key, callback) Mock.keyBinds[key] = callback end
 function RegisterHook() end
 function RegisterLoadMapPreHook(callback) Mock.loadMap = callback end
 function LoopInGameThreadWithDelay(_, fn) Mock.loop = fn return 1 end
+function LoopInGameThreadAfterFrames(_, fn) Mock.frameLoop = fn return 2 end
+EngineTickAvailable = true
 function print(text) Mock.printed[#Mock.printed + 1] = text end
 
 Key = setmetatable({}, { __index = function(_, name) return name end })
@@ -79,7 +83,7 @@ Key = setmetatable({}, { __index = function(_, name) return name end })
 -- Strict globals: reading an undefined global (a typo) or creating an unexpected one is an error.
 -- Reads are also recorded, because the mod wraps most calls in pcall (Unreal.Try), which would
 -- swallow the error.
-local ALLOWED_NEW_GLOBALS = { ModTick = true, ModTickHandle = true }
+local ALLOWED_NEW_GLOBALS = { ModTick = true, ModTickHandle = true, ModFrame = true, ModFrameHandle = true }
 Mock.undefinedGlobals = {}
 setmetatable(_G, {
     __index = function(_, name)
