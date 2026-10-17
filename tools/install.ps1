@@ -10,9 +10,13 @@
         Scripts\game\            games\<game>\       (without manifest.json)
         assets\                 assets\             (the menu's mark, arrows, button disc, fonts)
         enabled.txt, LICENSE
-    then copies it into <gameDir>\<modsPath>\<modName>\, keeping settings.cfg and teleports.txt.
+    then copies it into UE4SS's Mods folder, keeping settings.cfg and teleports.txt.
 
-    games\<game>\manifest.json says where the game is, whether it uses GAS, which mods Overhand
+    The game is found in Steam libraries, Xbox app / Game Pass folders (every drive), Epic Games and
+    GOG installs, by the folder names in the manifest (installFolders). Its UE4SS Mods folder is
+    <projectFolder>\Binaries\Win64 or WinGDK, then ue4ss\Mods (UE4SS 3) or Mods (older UE4SS).
+
+    games\<game>\manifest.json names the game's folders, whether it uses GAS, which mods Overhand
     replaces (switched off: enabled.txt renamed to enabled.txt.disabled) and which earlier folders of
     this mod to migrate settings from (then removed).
 
@@ -21,12 +25,13 @@
 
 .EXAMPLE
     .\tools\install.ps1 -Game valormortis
-    .\tools\install.ps1 -Game valormortis -GameDir "D:\SteamLibrary\steamapps\common\Valor Mortis"
+    .\tools\install.ps1 -Game valormortis -GameDir "E:\Games\Valor Mortis"
     .\tools\install.ps1 -Game valormortis -Uninstall
 #>
 param(
     [Parameter(Mandatory = $true)][string]$Game,
-    # The game folder (the one containing the game's own folder). Default: the manifest's.
+    # The game's folder, when it isn't found or more than one install is: the install folder, its
+    # Content folder (Xbox app) or the Binaries\Win64 folder all work.
     [string]$GameDir,
     [switch]$Uninstall,
     [switch]$BuildOnly
@@ -39,7 +44,6 @@ $gameSource = Join-Path $repo "games\$Game"
 $manifestPath = Join-Path $gameSource "manifest.json"
 if (-not (Test-Path $manifestPath)) { throw "No game '$Game' (missing $manifestPath)" }
 $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-if (-not $GameDir) { $GameDir = $manifest.defaultGameDir }
 
 # ---------------------------------------------------------------------------
 # Build
@@ -61,11 +65,113 @@ Copy-Item (Join-Path $repo "LICENSE") $build
 if ($BuildOnly) { return }
 
 # ---------------------------------------------------------------------------
+# Find the game
+# ---------------------------------------------------------------------------
+
+$names = @($manifest.installFolders)
+
+# Folders where a store keeps this game: @{ Store; Path } for each that exists.
+function Find-StoreInstalls {
+    $found = @()
+    # Steam: every library listed in libraryfolders.vdf, then steamapps\common\<name>.
+    $steam = (Get-ItemProperty "HKCU:\Software\Valve\Steam" -ErrorAction SilentlyContinue).SteamPath
+    if ($steam) {
+        $libraries = @($steam)
+        $vdf = Join-Path $steam "steamapps\libraryfolders.vdf"
+        if (Test-Path $vdf) {
+            $libraries += Select-String -Path $vdf -Pattern '"path"\s+"(.+?)"' |
+                ForEach-Object { $_.Matches[0].Groups[1].Value -replace '\\\\', '\' }
+        }
+        foreach ($library in ($libraries | Select-Object -Unique)) {
+            foreach ($name in $names) { $found += @{ Store = "Steam"; Path = Join-Path $library "steamapps\common\$name" } }
+        }
+    }
+    # Xbox app / Game Pass: each drive's .GamingRoot names its game folders ("RGBX", a count, then
+    # UTF-16 paths from the drive root); XboxGames is the default.
+    foreach ($drive in Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue) {
+        $roots = @("XboxGames")
+        $gamingRoot = Join-Path $drive.Root ".GamingRoot"
+        if (Test-Path $gamingRoot) {
+            $bytes = [System.IO.File]::ReadAllBytes($gamingRoot)
+            if ($bytes.Length -gt 8) {
+                $roots += [System.Text.Encoding]::Unicode.GetString($bytes, 8, $bytes.Length - 8).Split([char]0) |
+                    Where-Object { $_ }
+            }
+        }
+        foreach ($root in ($roots | Select-Object -Unique)) {
+            foreach ($name in $names) { $found += @{ Store = "Xbox app"; Path = Join-Path $drive.Root "$root\$name" } }
+        }
+    }
+    # Epic Games: the launcher's install manifests.
+    $epic = Join-Path $env:ProgramData "Epic\EpicGamesLauncher\Data\Manifests"
+    if (Test-Path $epic) {
+        foreach ($item in Get-ChildItem $epic -Filter *.item) {
+            $entry = Get-Content $item.FullName -Raw | ConvertFrom-Json
+            if ($entry.InstallLocation -and (($names -contains (Split-Path $entry.InstallLocation -Leaf)) -or ($names -contains $entry.DisplayName))) {
+                $found += @{ Store = "Epic Games"; Path = $entry.InstallLocation }
+            }
+        }
+    }
+    # GOG: one registry key per game.
+    foreach ($key in Get-ChildItem "HKLM:\SOFTWARE\WOW6432Node\GOG.com\Games" -ErrorAction SilentlyContinue) {
+        $entry = Get-ItemProperty $key.PSPath
+        if ($entry.path -and (($names -contains (Split-Path $entry.path -Leaf)) -or ($names -contains $entry.gameName))) {
+            $found += @{ Store = "GOG"; Path = $entry.path }
+        }
+    }
+    $found | Where-Object { Test-Path $_.Path }
+}
+
+# The game's Binaries folder under a game folder (itself, its Content folder for the Xbox app, or the
+# Binaries folder given directly), and UE4SS's Mods folder in it ($null when UE4SS is missing).
+function Find-Binaries($folder) {
+    $candidates = @()
+    if ((Split-Path $folder -Leaf) -in "Win64", "WinGDK") { $candidates += $folder }
+    foreach ($base in $folder, (Join-Path $folder "Content")) {
+        foreach ($platform in "Win64", "WinGDK") { $candidates += Join-Path $base "$($manifest.projectFolder)\Binaries\$platform" }
+    }
+    foreach ($binaries in $candidates) {
+        if (-not (Test-Path $binaries)) { continue }
+        $mods = @("ue4ss\Mods", "Mods") | ForEach-Object { Join-Path $binaries $_ } | Where-Object { Test-Path $_ } | Select-Object -First 1
+        return @{ Binaries = $binaries; Mods = $mods }
+    }
+    return $null
+}
+
+if ($GameDir) {
+    $install = Find-Binaries $GameDir
+    if (-not $install) { throw "No $($manifest.projectFolder)\Binaries\Win64 (or WinGDK) under $GameDir" }
+    $where = $GameDir
+} else {
+    # One entry per Binaries folder (Steam's registry path and its library list differ in case; Epic
+    # has a manifest per add-on, all in the same folder).
+    $seen = @{}
+    $installs = @(Find-StoreInstalls | ForEach-Object {
+        $binaries = Find-Binaries $_.Path
+        if ($binaries -and -not $seen.ContainsKey($binaries.Binaries.ToLowerInvariant())) {
+            $seen[$binaries.Binaries.ToLowerInvariant()] = $true
+            $binaries.Store = $_.Store
+            $binaries
+        }
+    })
+    if ($installs.Count -eq 0) {
+        throw "$($manifest.gameName) not found in Steam, Xbox app, Epic Games or GOG folders (looked for: $($names -join ', ')). Pass -GameDir <the game's folder>."
+    }
+    if ($installs.Count -gt 1) {
+        $list = ($installs | ForEach-Object { "  $($_.Store): $($_.Binaries)" }) -join "`n"
+        throw "$($manifest.gameName) is installed more than once:`n$list`nPass -GameDir with the one to use."
+    }
+    $install = $installs[0]
+    $where = "$($install.Store) install"
+}
+if (-not $install.Mods) { throw "UE4SS not found in $($install.Binaries) (no ue4ss\Mods or Mods folder). Install UE4SS first." }
+$mods = $install.Mods
+"Found $($manifest.gameName) ($where): $mods"
+
+# ---------------------------------------------------------------------------
 # Install
 # ---------------------------------------------------------------------------
 
-$mods = Join-Path $GameDir $manifest.modsPath
-if (-not (Test-Path $mods)) { throw "UE4SS Mods folder not found: $mods (is UE4SS installed? is -GameDir right?)" }
 if (Get-Process -Name $manifest.processName -ErrorAction SilentlyContinue) { throw "$($manifest.gameName) is running. Close it first." }
 $target = Join-Path $mods $manifest.modName
 

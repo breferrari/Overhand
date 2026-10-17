@@ -11,7 +11,7 @@ The game's code module is **MinotaurCore** (`/Script/MinotaurCore.*`); its asset
 | Engine | Unreal Engine 5.7 |
 | UE4SS | experimental-latest required (stable 3.0.1 predates UE 5.6/5.7). Tested: `UE4SS_v3.0.1-1176-g1ba38db4` |
 | Crash Fix | `bForceGUObjectArrayForIteration = true` (community recommendation) |
-| Game Pass path | `C:\XboxGames\Valor Mortis\Content\ValorMortis\Binaries\Win64\` (`Win64`, not `WinGDK`); exe `ValorMortisMSG-Win64-Shipping.exe` |
+| Game Pass path (the tested build) | `C:\XboxGames\Valor Mortis\Content\ValorMortis\Binaries\Win64\` (`Win64`, not `WinGDK`); exe `ValorMortisMSG-Win64-Shipping.exe` |
 | UE4SS proxy | `dwmapi.dll` works on the Game Pass build (**confirmed in game**) |
 
 ## Player

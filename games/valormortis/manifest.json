@@ -1,8 +1,8 @@
 {
     "gameName": "Valor Mortis",
     "modName": "Overhand",
-    "defaultGameDir": "C:\\XboxGames\\Valor Mortis\\Content",
-    "modsPath": "ValorMortis\\Binaries\\Win64\\ue4ss\\Mods",
+    "installFolders": ["Valor Mortis"],
+    "projectFolder": "ValorMortis",
     "processName": "ValorMortis*",
     "usesGas": true,
     "replacesMods": ["ValorCheatMenu", "PassiveHealthRegen"],

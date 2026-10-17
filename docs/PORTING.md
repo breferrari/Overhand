@@ -48,6 +48,8 @@ games/atomicheart/
   features/       one module per feature group
 ```
 
+`installFolders` are the names stores give the game's folder (`steamapps\common\<name>`, `XboxGames\<name>`, Epic's and GOG's install folder or title); list more than one if stores differ. `projectFolder` is the folder with `Binaries\Win64` (or `WinGDK`) inside the install; the installer looks for UE4SS's `ue4ss\Mods` or `Mods` there. Nothing in the manifest is specific to one PC or one store.
+
 Inside the game folder, require its own modules as `game.*` (it is installed as `Scripts/game/`), and the shared ones as `core.*` / `gas.*`.
 
 **`manifest.json`**
@@ -56,8 +58,8 @@ Inside the game folder, require its own modules as `game.*` (it is installed as 
 {
     "gameName": "Atomic Heart",
     "modName": "Overhand",
-    "defaultGameDir": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Atomic Heart",
-    "modsPath": "AtomicHeart\\Binaries\\Win64\\ue4ss\\Mods",
+    "installFolders": ["Atomic Heart"],
+    "projectFolder": "AtomicHeart",
     "processName": "AtomicHeart*",
     "usesGas": false,
     "replacesMods": [],
@@ -139,7 +141,7 @@ In the game: F5 or L3 + R3; check `Overhand.log` for "player found" and the feat
 
 ## Things that may differ per game
 
-- **Input mode with a controller.** In Valor Mortis the UI-only input mode stops controller buttons from reaching the game, so a controller-opened menu uses game-and-UI mode (`core/ui/input.lua`). Check the log's `controller:` lines in the new game.
+- **Input mode with a controller.** In Valor Mortis the UI-only input mode stops controller buttons from reaching the game, so a controller-opened menu uses game-and-UI mode (`core/ui/input.lua`). Check the log's `controller:` lines in the new game. A game using CommonUI can take a button's press and pass on only its release: in Valor Mortis the first A after the menu opens arrives that way. The menu acts on A's release, watched every frame, so this is covered; the log says "released, its press never reached the controller" when it happens.
 - **World detection.** The runner starts a new world when the identity object (the player character) changes. If a game reuses the pawn across loads, give `Runner.Configure` a different identity (e.g. the world or game state).
 - **Theme.** Pick colours from the game's own UI: a dark panel, a text colour, one accent for what is on, one for what is selected. Roles are listed in `core/ui/widgets.lua`; anything left out keeps the neutral default. The mark is loaded from a PNG with the engine's `ImportFileAsTexture2D`; if that fails the menu draws a small diamond (the log says which). Fonts: `fonts = { display = { faces = { Regular = "...", Bold = "..." } }, body = ... }` names `.ttf` files in `assets/fonts/`, or is the object path of a font the game has. The log's `menu fonts:` line says whether the theme's fonts were used, and why not.
 - **Menu scaling** assumes a 1080p layout scaled to the viewport, which suits most games.

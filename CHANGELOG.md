@@ -12,10 +12,12 @@ New (following Valor Mortis Cheat Menu 1.4.0's findings, reimplemented the Overh
 - **Give Item → Quest Items**, with a warning in the description.
 - **Quests** tab (read only): your active quests and what the current step asks for, and *Write quest report* (`Overhand-Quests.txt`: the quests' structure by reflection, to build a quest helper that knows which items a step needs).
 
+Install:
+- **The installer finds the game** in Steam libraries, Xbox app / Game Pass folders on any drive, Epic Games and GOG installs, and UE4SS in it (`ue4ss\Mods` or older UE4SS's `Mods`, under `Binaries\Win64` or `WinGDK`). The manifest names the game's folders instead of one PC's path; `-GameDir` accepts the install, its `Content` folder or `Binaries\Win64`, and is needed only when the game isn't found or is installed twice.
+
 Fixes:
 - **The controller's first A after opening the menu did nothing.** The cause is confirmed in game: the game's CommonUI takes that press, and only its release reaches the player controller. A now acts on its release, counted even when the press never showed, and is watched every frame while the menu is open (**fix confirmed in game**).
 - **Instant Sprint** only on the ground (in the air it steered away the momentum of jumps and swings).
-- **The first open of a dropdown showed nothing** (it opened, but a widget built hidden is drawn with no size the first time): the dropdowns get one layout pass at build.
 - **Give Item** checks the count a second later and says what changed ("Sharp Coating: 3 -> 8", or "you carry the most (3); the rest went to storage") instead of a blind "Added".
 - **Lists** (Item, Quest): the row shows its value with a ▾; pressing opens the list in the description panel (6 at a time, with a scroll indicator and a "12 / 34" position), so it never pushes the rows or goes off screen. Left / right no longer step them.
 - **Fits the screen**: the menu is drawn at the design's size (scale 1.0); the rows area has a maximum height, scrolls to keep the selected row in view and shows a scroll indicator when a tab is taller. The keyboard's keys go on a second footer line (arrow keys drawn as arrows), and the status line is clipped instead of running under them.

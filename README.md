@@ -43,12 +43,12 @@ The footer shows the buttons of the device you opened the menu with (or the game
 
 ```powershell
 .\tools\install.ps1 -Game valormortis
-.\tools\install.ps1 -Game valormortis -GameDir "D:\SteamLibrary\steamapps\common\Valor Mortis"
+.\tools\install.ps1 -Game valormortis -GameDir "E:\Games\Valor Mortis"   # when it isn't found, or is installed twice
 .\tools\install.ps1 -Game valormortis -Uninstall
 .\tools\install.ps1 -Game valormortis -BuildOnly      # only assemble build\valormortis\Overhand\
 ```
 
-The script assembles `build\<game>\Overhand\` and copies it into the game's `ue4ss\Mods\Overhand\`:
+The script finds the game in your Steam libraries, Xbox app / Game Pass folders (any drive), Epic Games and GOG installs, and UE4SS in it (`ue4ss\Mods`, or `Mods` for older UE4SS, under `Binaries\Win64` or `WinGDK`). It assembles `build\<game>\Overhand\` and copies it into that Mods folder:
 
 ```
 Scripts\main.lua    src\main.lua
@@ -58,7 +58,7 @@ Scripts\game\       games\<game>\      (only that game)
 assets\             assets\            (the menu's mark, arrows, button disc, fonts)
 ```
 
-A game update or a Game Pass / Steam "repair" can remove UE4SS and the mod; install again afterwards. Your `settings.cfg` and teleports are kept across installs. The game's `manifest.json` lists other mods Overhand replaces (they are switched off, not deleted) and earlier folder names to take settings from.
+A game update or a store's "repair" / "verify files" can remove UE4SS and the mod; install again afterwards. Your `settings.cfg` and teleports are kept across installs. The game's `manifest.json` lists other mods Overhand replaces (they are switched off, not deleted) and earlier folder names to take settings from.
 
 ## Files it writes
 

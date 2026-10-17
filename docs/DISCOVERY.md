@@ -92,7 +92,7 @@ end)
 
 ## 5. Testing in the game
 
-- **Logs:** `Mods\Overhand\Overhand.log` (this session; `.log.old` is the previous one) and `ue4ss\UE4SS.log` (everything, with timestamps). Overhand logs "player found", each setting change ("menu: key -> value"), the first few times each cheat acts (e.g. "damage taken: 50% (4 resistances raised)", "health regeneration: ... through the game") and any error with its stack trace.
+- **Logs:** `Mods\Overhand\Overhand.log` (this session; `.log.old` is the previous one; times in whole seconds) and `ue4ss\UE4SS.log` (everything, with millisecond timestamps: use it when the order of events matters, e.g. input). Overhand logs "player found", each setting change ("menu: key -> value"), the first few times each cheat acts (e.g. "damage taken: 50% (4 resistances raised)", "health regeneration: ... through the game") and any error with its stack trace.
 - **Debug logging** (Misc tab) logs every action, e.g. each damage hook call and each effect appearing on the player. Turn it on to see what the game does, off afterwards.
 - **Write bug report** (Misc tab) collects settings, game state and the last 150 log lines in one file.
 - **Smoke test first:** `python tools/smoke_test.py <game>` catches load and wiring errors before you start the game.

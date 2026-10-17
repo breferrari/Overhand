@@ -56,7 +56,7 @@ Everything kept is per world and dropped by the single world reset when a new Wi
 ## The menu
 
 - **Closed:** each tick reads the key queue and one controller button (L3; R3 only while L3 is held) and returns.
-- **Open:** the visible tab is redrawn 4 times a second and after every key press, but only widgets whose text or colour changed are touched (usually none, or the two rows the selection moved between). Long lists (Give Item, teleport slots) are rebuilt only when their source changes. No searches.
+- **Open:** the visible tab is redrawn 4 times a second and after every key press, but only widgets whose text or colour changed are touched (usually none, or the two rows the selection moved between). Long lists (Give Item, teleport slots) are rebuilt only when their source changes. No searches. The controller's A is also read every frame (two key reads), for releases visible for one frame only.
 - **First open:** builds all widgets once (a few hundred `StaticConstructObject` calls). Expect one short hitch the first time you press F5 in a session.
 
 ## Checking it yourself

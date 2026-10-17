@@ -26,7 +26,7 @@ UE4SS loads `Scripts/main.lua`; everything else is a module loaded with `require
 
 Each game also has a reference of its internals in `docs/games/<game>.md`.
 
-`manifest.json` holds what the installer and the smoke test need: the game's install path and UE4SS Mods path, its process name, whether it uses GAS, mods Overhand replaces (switched off on install), earlier folder names of this mod (settings migrated, folder removed), and the smoke test's expectations.
+`manifest.json` holds what the installer and the smoke test need: the game's folder names (`installFolders`, as Steam, the Xbox app, Epic or GOG name its folder; the installer finds the install) and Unreal project folder (`projectFolder`, which holds `Binaries\Win64` or `WinGDK`), its process name, whether it uses GAS, mods Overhand replaces (switched off on install), earlier folder names of this mod (settings migrated, folder removed), and the smoke test's expectations.
 
 ## Layers
 
@@ -68,9 +68,9 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 | `override.lua` | Change a game value and put the vanilla value back later, even when the game changes it in between. What is changed is an accessor (read/write, saved or not): `Override.PROPERTY` here, GAS attributes in `gas/`. |
 | `runner.lua` | The per-tick loop for the game's features: detects a new player character (new world), runs once-per-world checks, ticks every feature guarded on its own. |
 | `bug_report.lua` | `<name>-BugReport.txt`: settings, the game's sections, recent log lines. |
-| `ui/menu.lua` | The menu framework: item kinds (toggle, choice, list (a choice with a dropdown), action, section, info; sub-rows, descriptions), navigation, drawing only what changed, open/close. The layout: header (mark, title, game name, tabs with changed-row counts), rows (OFF \| ON toggles, ‹ value › choices, a mark on rows changed from vanilla), the selected row's description, a footer with the status, the changed count and the buttons that act on the selected row. |
+| `ui/menu.lua` | The menu framework: item kinds (toggle, choice, list (a choice picked from a list that opens in the description panel), action, section, info; sub-rows, descriptions), navigation, drawing only what changed, open/close. The layout: header (mark, title, game name, tabs with changed-row counts), rows (OFF \| ON toggles, ‹ value › choices, a mark on rows changed from vanilla; a tab taller than the screen scrolls, with an indicator), the selected row's description, a footer with the status, the changed count and the buttons that act on the selected row. |
 | `ui/widgets.lua` | Building UMG widgets from Lua: text, borders, outlines, bars, diamonds, shrink-to-fit boxes, key and face-button chips, tinted icons, textures from PNG files, the theme's fonts; the theme (colour roles written as sRGB hex, converted to the linear colours UMG draws with). |
-| `ui/input.lua` | Keyboard queue, controller polling (L3 + R3, D-pad, A, B, LB, RB), blocking the game's input while the menu is open. |
+| `ui/input.lua` | Keyboard queue, controller polling (L3 + R3, D-pad, A, B, LB, RB), blocking the game's input while the menu is open. A acts on its release, watched every frame (`WatchReleases`), because a game can take its press (Valor Mortis' CommonUI does, for the first A). |
 | `ui/game_menus.lua` | Is one of the game's own menus open? (classes from the game, cached widgets) |
 | `ui/icon_finder.lua` | Writes the loaded images that look like controller button prompts to a file, to map the game's own icons. |
 | `ui/fonts.lua` | The theme's fonts at runtime: a Font copied from the engine's Roboto whose typeface entries stream our `.ttf` files from `assets/fonts/` by file name (no FontFace assets: one made at runtime has no file name, so it renders nothing). The menu falls back to the engine font when a file is missing or its text lays out empty. |
@@ -88,7 +88,7 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 | `app.lua` | Name, version, menu title, every setting with its vanilla value. |
 | `game.lua` | Valor Mortis access: controller and player classes, components, attribute sets, subsystems, items, the developers' cheat manager. |
 | `shared.lua` | Runtime flags more than one feature reads (NoClip active, safe landing). |
-| `sheet.lua` | The menu content: six tabs, what each row is bound to and what it does (its description). |
+| `sheet.lua` | The menu content: seven tabs, what each row is bound to and what it does (its description). |
 | `theme.lua` | The menu's look for this game: palette, subtitle, mark (`assets/mark.png`), optional display font. |
 | `features/health.lua` | God Mode, Infinite Stamina / Nephtoglobin, Fall Damage, Max Health, Health Regeneration |
 | `features/defense.lua` | Damage Taken (raises the resistance attributes) |
@@ -101,7 +101,7 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 | `features/buffs.lua` | Infinite Buffs |
 | `features/give.lua` | Catalysts, materials, consumables, Give Item catalog (with quest items) and its count check, weapons, abilities, gems |
 | `features/progression.lua` | Free Respec (the lantern's respec costs) |
-| `features/quests.lua` | The Quests tab: quests, their state and current step (read only) |
+| `features/quests.lua` | The Quests tab: active quests and what their current step asks for (read only); the quest report (`Overhand-Quests.txt`) |
 | `features/dev_actions.lua` | The developers' Blueprint cheat actions; No Ability Costs |
 | `features/saved_values.lua` | Once per world: repairs old cheat menu damage values, restores ledger values |
 
