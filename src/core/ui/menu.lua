@@ -50,6 +50,7 @@ local LIST_LINE_HEIGHT = 26
 local LIST_TRACK_WIDTH = 2     -- the list's scroll indicator
 local PAGE_MAX_HEIGHT = 600    -- the rows area scrolls past this (the menu, list open, fits 1080p)
 local SCROLL_MARGIN = 12       -- room kept around the selected row when scrolling to it
+local PICKER_WARMUP_TICKS = 3  -- the list panel's invisible first paint (see build)
 local MARK_SIZE = 26
 local ARROW_WIDTH, ARROW_HEIGHT = 5, 7
 local CORNER_LENGTH, CORNER_THICKNESS = 12, 2
@@ -57,6 +58,7 @@ local POSITION = { X = 40, Y = 40 }
 local REFERENCE_HEIGHT = 1080
 local REFRESH_INTERVAL = 0.25
 local GAME_MENU_CHECK_INTERVAL = 0.5
+local DESCRIPTION_MIN_HEIGHT = 40
 local STATUS_MAX_WIDTH = 150   -- the footer's status line is cut off past this, the buttons keep their room
 
 local FONT_SIZE = {
@@ -560,16 +562,15 @@ local function buildHeader(tree, column)
     return tabWidgets, title
 end
 
--- A scroll indicator: a thumb on a track, height high, hidden until something scrolls. paintOnly:
--- hidden by opacity (it keeps its space; see the list in buildDescription), else collapsed.
-local function buildScrollTrack(tree, name, height, paintOnly)
+-- A scroll indicator: a thumb on a track, height high. Hidden until something scrolls.
+local function buildScrollTrack(tree, name, height)
     local track = Widgets.Overlay(tree, name)
     Widgets.Align(track:AddChild((Widgets.Bar(tree, name .. "Line", COLORS.edge, LIST_TRACK_WIDTH, height))), FILL, START)
     local thumbBox = Widgets.Bar(tree, name .. "Thumb", COLORS.highlight, LIST_TRACK_WIDTH, height)
-    Widgets.Align(track:AddChild(thumbBox), FILL, START)
-    try(function() thumbBox:SetRenderTransformPivot({ X = 0.0, Y = 0.0 }) end)   -- scaled from its top
-    if paintOnly then Widgets.SetOpacity(track, 0) else Widgets.SetVisible(track, false) end
-    return { box = track, thumbBox = thumbBox, height = height, paintOnly = paintOnly, shown = {} }
+    local thumbSlot = track:AddChild(thumbBox)
+    Widgets.Align(thumbSlot, FILL, START)
+    Widgets.SetVisible(track, false)
+    return { box = track, thumbBox = thumbBox, thumbSlot = thumbSlot, height = height, shown = {} }
 end
 
 -- An open list: LIST_ROWS lines (a mark on the current option, the highlighted one lit) and a scroll
@@ -591,7 +592,7 @@ local function buildPicker(tree)
         lines[index] = { box = lineBox, border = border, bar = bar, marker = marker, text = text, shown = {} }
     end
     Widgets.Fill(box:AddChild(stack))
-    local track = buildScrollTrack(tree, "PickerTrack", LIST_ROWS * LIST_LINE_HEIGHT, true)
+    local track = buildScrollTrack(tree, "PickerTrack", LIST_ROWS * LIST_LINE_HEIGHT)
     Widgets.Pad(box:AddChild(track.box), 8, 0, 0, 0)
     return { box = box, lines = lines, track = track }
 end
@@ -608,18 +609,13 @@ local function buildDescription(tree, column)
     local position = Widgets.Text(tree, "DescriptionPosition", "", FONT_SIZE.descriptionTitle, COLORS.muted, { spacing = 80 })
     addCentered(titleLine, position)
     stack:AddChild(titleLine)
-    -- The description and the list share one space, both always laid out: opening a list only swaps
-    -- their opacity. (A layout change here showed one input late with the controller: the list
-    -- opened, but appeared only on the next press. Paint changes show at once.)
-    local content = Widgets.Overlay(tree, "DescriptionContent")
     local bodyBox = Widgets.SizeBox(tree, "DescriptionBodyBox")
+    try(function() bodyBox:SetMinDesiredHeight(DESCRIPTION_MIN_HEIGHT) end)
     local body = Widgets.Text(tree, "DescriptionBody", "", FONT_SIZE.description, COLORS.label, { wrap = true, lineHeight = 1.15 })
     bodyBox:SetContent(body)
-    Widgets.Align(content:AddChild(bodyBox), FILL, START)
+    Widgets.Pad(stack:AddChild(bodyBox), 0, 6, 0, 0)
     local picker = buildPicker(tree)
-    Widgets.Align(content:AddChild(picker.box), FILL, START)
-    Widgets.SetOpacity(picker.box, 0)
-    Widgets.Pad(stack:AddChild(content), 0, 6, 0, 0)
+    Widgets.Pad(stack:AddChild(picker.box), 0, 6, 0, 0)
 
     local outline = Widgets.Outlined(tree, "DescriptionOutline", panel, COLORS.descriptionEdge)
     Widgets.Pad(column:AddChild(outline), SIDE_PADDING, 0, SIDE_PADDING, 14)
@@ -753,6 +749,11 @@ local function build(controller)
     local footer = buildFooter(tree, column)
 
     try(function() root:AddToViewport(1000) end)
+    -- The list panel is never painted the first time it is shown (tested: the list opened, the log
+    -- said so, but it appeared only on the second open; from then on always). So it is painted once
+    -- right away, invisible (opacity 0), and hidden after PICKER_WARMUP_TICKS.
+    try(function() description.picker.box:SetRenderOpacity(0.0) end)
+    for _, line in ipairs(description.picker.lines) do Widgets.SetText(line.text, "·") end
     if (Widgets.fonts.display or Widgets.fonts.body) and not textRenders({ title, tabWidgets[1] and tabWidgets[1].label }) then
         Log.Info("menu fonts: the theme's fonts laid out empty (the engine could not read them); using the engine font")
         themeFontsFailed = true
@@ -761,10 +762,10 @@ local function build(controller)
     end
     view.widgets = {
         root = root, frame = frame, frameSlot = frameSlot, tabs = tabWidgets, pages = pages, scroll = scroll, scrollTrack = scrollTrack,
-        description = description, footer = footer,
+        description = description, footer = footer, pickerWarmupTicks = PICKER_WARMUP_TICKS,
     }
     view.shownTabIndex = nil
-    view.shown = {}
+    view.shown = { pickerVisible = false }   -- (it is visible, but only for the warm-up)
 end
 
 -- The menu is laid out for 1080p and scaled to the viewport (UMG's own DPI scale divided out).
@@ -804,21 +805,14 @@ local function setVisible(state, key, widget, visible)
 end
 
 -- Shows the part in view: visible of total, starting at first (any unit). Hidden when all fits.
--- (Paint only: the thumb is a full-height bar scaled and moved by its render transform.)
 local function drawScrollTrack(track, first, visible, total)
     local scrolls = total > visible + 0.5
-    if changed(track.shown, "scrolls", scrolls) then
-        if track.paintOnly then Widgets.SetOpacity(track.box, scrolls and 1 or 0) else Widgets.SetVisible(track.box, scrolls) end
-    end
+    setVisible(track.shown, "visible", track.box, scrolls)
     if not scrolls then return end
     local thumbHeight = math.max(10, math.floor(track.height * visible / total))
     local thumbTop = math.floor((track.height - thumbHeight) * first / math.max(total - visible, 1))
-    if changed(track.shown, "thumbHeight", thumbHeight) then
-        try(function() track.thumbBox:SetRenderScale({ X = 1.0, Y = thumbHeight / track.height }) end)
-    end
-    if changed(track.shown, "thumbTop", thumbTop) then
-        try(function() track.thumbBox:SetRenderTranslation({ X = 0.0, Y = thumbTop }) end)
-    end
+    if changed(track.shown, "thumbHeight", thumbHeight) then try(function() track.thumbBox:SetHeightOverride(thumbHeight) end) end
+    if changed(track.shown, "thumbTop", thumbTop) then Widgets.Pad(track.thumbSlot, 0, thumbTop, 0, 0) end
 end
 
 -- A selectable line lit (selected) or not: its background and edge bar.
@@ -859,12 +853,16 @@ local function drawPicker(picker, list)
     for index, line in ipairs(picker.lines) do
         local optionIndex = list.first + index - 1
         local option = options[optionIndex]
-        local highlighted = option ~= nil and optionIndex == list.highlighted
-        local isCurrent = option ~= nil and optionIndex == current
-        setText(line.shown, "text", line.text, option and option.label or "")
-        setTextColor(line.shown, "color", line.text, highlighted and COLORS.bright or COLORS.label)
-        drawLit(line.shown, line.border, line.bar, highlighted)
-        if changed(line.shown, "current", isCurrent) then Widgets.SetColor(line.marker, isCurrent and COLORS.accent or TRANSPARENT) end
+        setVisible(line.shown, "visible", line.box, option ~= nil)
+        if option then
+            local highlighted = optionIndex == list.highlighted
+            setText(line.shown, "text", line.text, option.label)
+            setTextColor(line.shown, "color", line.text, highlighted and COLORS.bright or COLORS.label)
+            drawLit(line.shown, line.border, line.bar, highlighted)
+            if changed(line.shown, "current", optionIndex == current) then
+                Widgets.SetColor(line.marker, optionIndex == current and COLORS.accent or TRANSPARENT)
+            end
+        end
     end
     drawScrollTrack(picker.track, list.first - 1, LIST_ROWS, #options)
     return #options > 0 and (list.highlighted .. " / " .. #options) or ""
@@ -922,6 +920,14 @@ local function drawTabCounts()
     end
 end
 
+-- The warm-up is over (its ticks ran out, or a list opened): full opacity, hidden unless open.
+local function endPickerWarmup()
+    local widgets = view.widgets
+    if not (widgets and widgets.pickerWarmupTicks) then return end
+    widgets.pickerWarmupTicks = nil
+    try(function() widgets.description.picker.box:SetRenderOpacity(1.0) end)
+    if not view.list then Widgets.SetVisible(widgets.description.picker.box, false) end
+end
 
 -- What the selected row does; while an action waits for its second press, what it will do and how
 -- to confirm (in the accent colour).
@@ -931,10 +937,11 @@ local function drawDescription(item)
     if not item then return end
     setText(shown, "descriptionTitle", description.title, item.upperLabel)
     local listOpen = view.list ~= nil
-    if changed(shown, "listShown", listOpen) then
+    setVisible(shown, "bodyVisible", description.bodyBox, not listOpen)
+    if changed(shown, "pickerVisible", listOpen) then
         Log.Debug("menu: list panel " .. (listOpen and "shown" or "hidden"))
-        Widgets.SetOpacity(description.bodyBox, listOpen and 0 or 1)
-        Widgets.SetOpacity(description.picker.box, listOpen and 1 or 0)
+        if listOpen then endPickerWarmup() end
+        Widgets.SetVisible(description.picker.box, listOpen)
     end
     setText(shown, "descriptionPosition", description.position, listOpen and drawPicker(description.picker, view.list) or "")
     if listOpen then return end
@@ -1140,6 +1147,10 @@ function Menu.Tick()
             close(gameMenu)
             return
         end
+    end
+    local warmup = view.widgets.pickerWarmupTicks
+    if warmup then
+        if warmup <= 1 then endPickerWarmup() else view.widgets.pickerWarmupTicks = warmup - 1 end
     end
     if App.status ~= view.shown.status or os.clock() >= view.nextRefreshAt then
         view.nextRefreshAt = os.clock() + REFRESH_INTERVAL
