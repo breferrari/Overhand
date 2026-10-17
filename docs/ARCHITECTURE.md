@@ -73,7 +73,7 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 | `ui/input.lua` | Keyboard queue, controller polling (L3 + R3, D-pad, A, B, LB, RB), blocking the game's input while the menu is open. |
 | `ui/game_menus.lua` | Is one of the game's own menus open? (classes from the game, cached widgets) |
 | `ui/icon_finder.lua` | Writes the loaded images that look like controller button prompts to a file, to map the game's own icons. |
-| `ui/fonts.lua` | The theme's fonts at runtime: a Font copied from the engine's Roboto whose typeface entries stream our `.ttf` files from `assets/fonts/` by file name (no FontFace assets: a cooked game does not read loose `.ufont` files). The menu falls back to the engine font when a file is missing or its text lays out empty. |
+| `ui/fonts.lua` | The theme's fonts at runtime: a Font copied from the engine's Roboto whose typeface entries stream our `.ttf` files from `assets/fonts/` by file name (no FontFace assets: one made at runtime has no file name, so it renders nothing). The menu falls back to the engine font when a file is missing or its text lays out empty. |
 
 ## src/gas/
 

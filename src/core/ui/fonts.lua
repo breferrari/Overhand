@@ -4,8 +4,10 @@
 -- How: the Font is a copy of the engine's Roboto (its composite font comes along). Each of its
 -- typeface entries is renamed to one of our weights ("Regular", "Medium", "SemiBold", "Bold") and
 -- pointed straight at our file: an entry without a FontFace asset streams the file named in its
--- FontFilename, so no asset, package or install into the game's Content folder is needed (a cooked
--- game does not read loose .ufont assets). The Font lives inside the Roboto font object (an outer
+-- FontFilename (FFontData falls back to its own fields without one), so no asset, package or
+-- install into the game's Content folder is needed. (A FontFace made at runtime does not work: its
+-- SourceFilename is only filled in when the engine loads one from disk, so it streams nothing and
+-- the text lays out empty, silently.) The Font lives inside the Roboto font object (an outer
 -- that always exists; a package cannot be looked up from Lua), is kept (root set) and remembered
 -- here, so it is built once per session. Only a font that was built completely is remembered.
 --
