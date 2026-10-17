@@ -8,7 +8,7 @@
 
     ValorianSheet replaces the Valor Mortis Cheat Menu and AeonGreyh's Passive Health Regen. If they
     are installed they are switched off (enabled.txt renamed to enabled.txt.disabled) so nothing is
-    applied twice; their folders stay, and ValorianSheet imports their settings on the first start.
+    applied twice; their folders stay.
 
     -Uninstall removes ValorianSheet and switches those mods back on.
 
@@ -57,6 +57,6 @@ foreach ($name in $replacedMods) {
     $enabled = Join-Path $mods "$name\enabled.txt"
     if (Test-Path $enabled) {
         Rename-Item $enabled "enabled.txt.disabled"
-        "$name switched off (its settings are imported on the first start)"
+        "$name switched off (ValorianSheet replaces it)"
     }
 }

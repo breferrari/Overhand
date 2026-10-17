@@ -2,7 +2,7 @@
 
 ## 1.1.0 (2026-10-17)
 
-- **Health Regeneration** now follows AeonGreyh's Passive Health Regen: health points per second (1–50), a delay after hits, a heal-up-to limit, out-of-combat option; healing goes through the game's attribute system (GASCompanion), so the HUD follows on its own. Its settings are imported on first start, and the install script switches that mod off, so one mod covers everything.
+- **Health Regeneration** now follows AeonGreyh's Passive Health Regen: health points per second (1–50), a delay after hits, a heal-up-to limit, out-of-combat option; healing goes through the game's attribute system (GASCompanion), so the HUD follows on its own. The install script switches that mod off, so one mod covers everything.
 - **Combat check** uses the world's EnemyInfoSubsystem (the check Passive Health Regen uses), for regeneration and Infinite Stamina's out-of-combat option.
 - **Cleanup** (`/simplify`):
   - one world reset (`Unreal.ResetWorld`, `Unreal.OnWorldReset`) instead of hand-wired resets
@@ -11,7 +11,8 @@
   - the menu checks for a loaded save before the confirm prompt (`Menu.Action` options); `Menu.Value` for menu-only values
   - shared helpers for the item database, tag names, HUD refreshes, rate-limited log lines, file I/O, `Game.IsPlayer`, `Game.PlayerHealth`, combat-utils hooks
 - **Efficiency:** one shared read of the active effects per tick, Dodge Window reads it only when it changes, the menu only redraws what changed, memoized dynamic lists, early returns for cheats that are off, no closures in the hottest helpers.
-- **Fixes along the way:** teleport slots beyond 5 imported from the Cheat Menu are kept on save; settings write whole numbers without ".0".
+- **Removed:** importing settings from the Valor Mortis Cheat Menu and Passive Health Regen (set them once in the menu).
+- **Fixes along the way:** every saved teleport slot is kept on save; settings write whole numbers without ".0".
 - **Code review fixes:**
   - A world reset hands back vanilla values on objects that survive it (Override:release), so Movement Speed etc. can no longer compound after a restart.
   - Refill Everything forgets item peaks with the world (no topping a new save up to another save's counts).
@@ -21,7 +22,6 @@
   - The cheats wait (up to 10 s) until the saved-values check could read the attribute sets.
   - Every feature tick runs guarded on its own.
   - No Ability Costs retries quietly without a cheat manager.
-  - settings.cfg from 1.0.0 migrates Health Regeneration.
 
 ## 1.0.0 (2026-10-17)
 

@@ -1,11 +1,10 @@
 """Smoke test for ValorianSheet, outside the game.
 
 1. Compiles every Lua file with Lua 5.4 (the version UE4SS embeds).
-2. First start next to the Valor Mortis Cheat Menu and Passive Health Regen: their settings,
-   teleports and attribute ledger must be imported.
-3. Loads the mod against tools/ue4ss_mock.lua in a temporary copy of the mod folder, runs the
+2. Loads the mod against tools/ue4ss_mock.lua in a temporary copy of the mod folder, runs the
    game-thread loop in the main menu and with a loaded save, walks every row of every tab with key
    presses, and fails on any error the mod logs ("ERROR in ...") or any undefined global it reads.
+3. A first start writes settings.cfg with the defaults.
 
 This catches syntax, wiring and load errors. It does not test game behaviour; that needs the game.
 
@@ -23,47 +22,6 @@ MOD = REPO / "mod" / "ValorianSheet"
 MOCK = REPO / "tools" / "ue4ss_mock.lua"
 TAB_COUNT = 6
 ROWS_PER_TAB = 14   # more than any tab has, so every row is visited
-
-# The Valor Mortis Cheat Menu's config.json format (ModMenu ConfigManager), with a ledger entry.
-CHEAT_MENU_CONFIG = """{
-  "alwaysParry": true,
-  "attrLedger": {
-    "MaxHealth": {
-      "vanilla": 100,
-      "written": 300
-    }
-  },
-  "debugLog": false,
-  "dmgTaken": 0.5,
-  "dock": "right",
-  "fallDamage": 0.75,
-  "godMode": false,
-  "maxHealthMult": 3,
-  "noClip": true,
-  "speedMult": 1.5
-}"""
-PASSIVE_REGEN_CONFIG = """-- PassiveHealthRegen settings. Press the menu key in game to change them.
-Enabled=1
-MenuX=40
-MenuY=40
-HealthPerSecond=7.5
-DelayAfterDamage=3.0
-MaxPercent=80.0
-OutOfCombatOnly=1
-"""
-IMPORT_EXPECTED = [
-    "perfectParry=true",
-    "damageTaken=0.5",
-    "fallDamage=0.75",
-    "maxHealthFactor=3",
-    "movementSpeed=1.5",
-    "regenPerSecond=7.5",
-    "regenDelay=3",
-    "regenMaxPercent=80",
-    "regenOnlyOutOfCombat=true",
-    "ledger.MaxHealth=100,300",
-]
-
 
 def compile_all() -> list[str]:
     errors = []
@@ -132,45 +90,14 @@ def fresh_mod_copy(temp: str) -> pathlib.Path:
     return mod_copy
 
 
-def test_import() -> list[str]:
+def test_first_start() -> list[str]:
     with tempfile.TemporaryDirectory() as temp:
         mod_copy = fresh_mod_copy(temp)
-        cheat_menu = pathlib.Path(temp) / "ValorCheatMenu"
-        cheat_menu.mkdir()
-        (cheat_menu / "config.json").write_text(CHEAT_MENU_CONFIG, encoding="utf-8")
-        (cheat_menu / "teleports.txt").write_text("2|Map_Hub|1.5|2.5|3.5|90|Bridge\n7|Map_Old|1|2|3|0|\n", encoding="utf-8")
-        passive_regen = pathlib.Path(temp) / "PassiveHealthRegen"
-        passive_regen.mkdir()
-        (passive_regen / "PassiveHealthRegen.cfg").write_text(PASSIVE_REGEN_CONFIG, encoding="utf-8")
-
         problems = run_mod(mod_copy, walk_menu=False)
         settings = (mod_copy / "settings.cfg").read_text(encoding="utf-8").splitlines()
-        teleports = (mod_copy / "teleports.txt").read_text(encoding="utf-8")
-    problems += [f"import: expected '{line}' in settings.cfg" for line in IMPORT_EXPECTED if line not in settings]
+    problems += [f"defaults: expected '{line}'" for line in ("godMode=false", "regenPerSecond=0", "debugLogging=false") if line not in settings]
     if any(line.startswith("noClip=") for line in settings):
-        problems.append("import: noClip is session-only and must not be saved")
-    for line in ("2|Map_Hub|1.5|2.5|3.5|90|Bridge", "7|Map_Old|1|2|3|0|"):
-        if line not in teleports:
-            problems.append(f"import: teleport '{line}' missing")
-    return problems
-
-
-def test_migration() -> list[str]:
-    """settings.cfg from 1.0.0 (regenRate, no regenPerSecond)."""
-    problems = []
-    for with_passive_regen, expected in ((True, "regenPerSecond=7.5"), (False, "regenPerSecond=5")):
-        with tempfile.TemporaryDirectory() as temp:
-            mod_copy = fresh_mod_copy(temp)
-            (mod_copy / "settings.cfg").write_text("godMode=true\nregenRate=0.02\nregenDelay=2\n", encoding="utf-8")
-            if with_passive_regen:
-                passive_regen = pathlib.Path(temp) / "PassiveHealthRegen"
-                passive_regen.mkdir()
-                (passive_regen / "PassiveHealthRegen.cfg").write_text(PASSIVE_REGEN_CONFIG, encoding="utf-8")
-            problems += run_mod(mod_copy, walk_menu=False)
-            settings = (mod_copy / "settings.cfg").read_text(encoding="utf-8").splitlines()
-        for line in (expected, "godMode=true"):
-            if line not in settings:
-                problems.append(f"migration ({'with' if with_passive_regen else 'without'} Passive Health Regen): expected '{line}'")
+        problems.append("noClip is session-only and must not be saved")
     return problems
 
 
@@ -185,8 +112,7 @@ def main() -> int:
         print("Compile errors:\n" + "\n".join(errors))
         return 1
     print("compile: ok")
-    tests = (("import from other mods", test_import), ("migration from 1.0.0", test_migration),
-             ("load + ticks + menu", test_menu_walk))
+    tests = (("load + ticks + menu", test_menu_walk), ("first start writes settings.cfg", test_first_start))
     for name, test in tests:
         problems = test()
         if problems:

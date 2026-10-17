@@ -67,7 +67,7 @@ While the menu is open the game gets no input, so you don't walk around or open 
 
 ### Coming from the Valor Mortis Cheat Menu or Passive Health Regen
 
-ValorianSheet replaces both; don't run them side by side. The install script switches them off (renames their `enabled.txt`) and leaves their folders alone. On the first start ValorianSheet **imports their settings**: the Cheat Menu's settings and teleports, including the record of values it wrote into your save (so nothing is left behind in your save file), and Passive Health Regen's regeneration settings.
+ValorianSheet replaces both; don't run them side by side. The install script switches them off (renames their `enabled.txt`) and leaves their folders alone. Settings are not imported: set them once in the menu. Damage multipliers left in a save by Cheat Menu 1.1.0 and older are still repaired automatically.
 
 ## Files it writes
 
@@ -95,7 +95,7 @@ pip install lupa
 python -I tools\smoke_test.py
 ```
 
-The smoke test compiles every file with Lua 5.4 (what UE4SS embeds), checks the settings import, and loads the mod against mock UE4SS objects: main menu, a loaded save, every row of every tab, and a map change. It catches syntax, wiring and load errors; game behaviour still needs the game.
+The smoke test compiles every file with Lua 5.4 (what UE4SS embeds), checks the first-start settings file, and loads the mod against mock UE4SS objects: main menu, a loaded save, every row of every tab, and a map change. It catches syntax, wiring and load errors; game behaviour still needs the game.
 
 ## Credits
 

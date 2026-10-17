@@ -7,11 +7,6 @@ local Paths = {}
 -- This file is <mod>/Scripts/lib/paths.lua; the mod folder is two levels up.
 local scriptFolder = (debug.getinfo(1, "S").source:match("^@(.*[\\/])")) or ""
 Paths.MOD_FOLDER = scriptFolder:gsub("[Ss]cripts[\\/]lib[\\/]$", "")
-local modsFolder = Paths.MOD_FOLDER:gsub("[^\\/]+[\\/]$", "")
-
--- Mods whose settings are imported on the first start (see settings.lua).
-Paths.CHEAT_MENU_FOLDER = modsFolder .. "ValorCheatMenu\\"
-Paths.PASSIVE_REGEN_FOLDER = modsFolder .. "PassiveHealthRegen\\"
 
 function Paths.InModFolder(fileName) return Paths.MOD_FOLDER .. fileName end
 

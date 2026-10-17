@@ -25,7 +25,7 @@ main.lua ──► settings.lua ─────────────┐
 | `state.lua` | `State.settings` (what the player chose), status line, teleports, ledger, and the few runtime flags that more than one feature reads. |
 | `features/*.lua` | One module per feature group. Each exposes `Tick()` plus the actions the menu calls, and registers its per-world state with `Unreal.OnWorldReset`. |
 | `cheats.lua` | Calls every feature's `Tick` in order, detects a new William (new save, map, respawn) and runs `Unreal.ResetWorld()`, runs the once-per-load checks. |
-| `settings.lua` | `settings.cfg` and `teleports.txt`, saved through `Settings.MarkDirty()` (at most once a second); one-time import from the Valor Mortis Cheat Menu and Passive Health Regen. |
+| `settings.lua` | `settings.cfg` and `teleports.txt`, saved through `Settings.MarkDirty()` (at most once a second). |
 | `ui/menu.lua` | The menu framework: item kinds (toggle, choice, action, section, info), navigation, drawing, open/close. |
 | `ui/sheet.lua` | The menu's content: which rows each tab has and what they are bound to. |
 | `ui/widgets.lua` | Building UMG widgets from Lua; colours. |
