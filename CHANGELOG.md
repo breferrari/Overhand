@@ -12,6 +12,9 @@
 - **Themes per game:** `games/<game>/theme.lua` (palette by role in sRGB hex, subtitle, mark, optional display font), passed with `Menu.Configure({ theme = ... })`. Valor Mortis: soot, parchment, crimson, brass.
 - **Mark:** `assets/mark.png` is installed with the mod and loaded with the engine's `ImportFileAsTexture2D`; if that fails the menu draws a small diamond. The log says which (`menu mark:`).
 - README: banner and a picture of the menu design.
+- **Fonts:** a theme names its fonts by object path or by name fragments matched against the game's loaded fonts (Valor Mortis asks for the design's Cinzel and Barlow, used if the game has them). Misc → *Find fonts* writes the loaded fonts to `Overhand-Fonts.txt`.
+- Sizes follow the design (its pixels at 1080p, fonts at 3/4), with one `MENU_SCALE` for the whole menu.
+- **Crash fix:** opening the menu crashed the game: two footer widgets had the same name, and constructing over an existing name of another class is a fatal engine error. `Widgets.Construct` now refuses a repeated name with a Lua error (logged, no crash), which the smoke test reports.
 
 ## 1.4.0 (2026-10-17): Overhand
 

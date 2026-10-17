@@ -67,11 +67,19 @@ end
 
 Widgets.ApplyTheme(nil)
 
--- Widget names must be unique per outer; every build gets its own prefix.
+-- Widget names must be unique per outer; every build gets its own prefix. Constructing over an
+-- existing name of another class is a fatal engine error (the game crashes), so a repeated name is
+-- refused here as a Lua error instead.
 local buildNumber = 0
-function Widgets.StartBuild() buildNumber = buildNumber + 1 end
+local usedNames = {}
+function Widgets.StartBuild()
+    buildNumber = buildNumber + 1
+    usedNames = {}
+end
 
 function Widgets.Construct(classPath, outer, name)
+    if usedNames[name] then error("widget name used twice: " .. name) end
+    usedNames[name] = true
     local widgetClass = Unreal.Static(classPath)
     if not Unreal.IsValid(widgetClass) then error("missing class " .. classPath) end
     local widget = StaticConstructObject(widgetClass, outer, FName(App.name .. buildNumber .. "_" .. name))
@@ -87,18 +95,49 @@ function Widgets.SetText(textBlock, text)
     try(function() textBlock:SetText(FText(text or "")) end)
 end
 
--- style (optional): { bold = true, spacing = 120 (thousandths of an em), font = "/Game/...Font",
---                     center = true, wrap = true }
+-- The theme's fonts, found when the menu is built: { display = UFont or nil, body = UFont or nil }.
+-- Without one, text uses the engine's default font (Roboto).
+Widgets.fonts = {}
+
+-- A font spec is an object path ("/Game/UI/Fonts/F_Title.F_Title") or a list of name fragments
+-- ({ "Cinzel", "Trajan" }) matched against the fonts the game has loaded, first fragment first.
+local function findFont(spec, loadedFonts)
+    if type(spec) == "string" then
+        local font = Unreal.Static(spec)
+        return Unreal.IsValid(font) and font or nil
+    end
+    for _, fragment in ipairs(spec) do
+        for _, font in ipairs(loadedFonts) do
+            local name = try(function() return font:GetFullName() end)
+            if name and name:lower():find(fragment:lower(), 1, true) then return font end
+        end
+    end
+    return nil
+end
+
+-- specs: { display = spec, body = spec } (both optional). One search of the loaded fonts, only
+-- when a spec is a name list; called once per menu build.
+function Widgets.ResolveFonts(specs)
+    Widgets.fonts = {}
+    if not specs then return Widgets.fonts end
+    local loadedFonts
+    for role, spec in pairs(specs) do
+        if type(spec) == "table" and not loadedFonts then loadedFonts = FindAllOf("Font") or {} end
+        Widgets.fonts[role] = findFont(spec, loadedFonts)
+    end
+    return Widgets.fonts
+end
+
+-- style (optional): { bold = true, spacing = 120 (thousandths of an em), display = true (the
+--                     theme's display font instead of its body font), center = true, wrap = true }
 function Widgets.Text(tree, name, text, fontSize, color, style)
     style = style or {}
     local textBlock = Widgets.Construct("/Script/UMG.TextBlock", tree, name)
     Widgets.SetText(textBlock, text)
     try(function()
         local font = textBlock.Font
-        if style.font then
-            local fontObject = Unreal.Static(style.font)
-            if Unreal.IsValid(fontObject) then font.FontObject = fontObject end
-        end
+        local fontObject = style.display and Widgets.fonts.display or Widgets.fonts.body
+        if fontObject then font.FontObject = fontObject end
         font.Size = fontSize
         if style.bold then font.TypefaceFontName = FName("Bold") end
         if style.spacing then font.LetterSpacing = style.spacing end
@@ -204,11 +243,11 @@ end
 function Widgets.KeyChip(tree, name, label)
     local colors = Widgets.COLORS
     local edge = Widgets.Border(tree, name .. "Edge", colors.chipEdge, { 1, 1, 1, 1 })
-    local face = Widgets.Border(tree, name .. "Face", colors.footer, { 5, 0, 5, 1 })
+    local face = Widgets.Border(tree, name .. "Face", colors.footer, { 5, 0, 5, 0 })
     Widgets.Round(edge, 3)
     Widgets.Round(face, 2)
     edge:SetContent(face)
-    face:SetContent(Widgets.Text(tree, name .. "Label", label, 9, colors.chipText, { bold = true }))
+    face:SetContent(Widgets.Text(tree, name .. "Label", label, 9, colors.chipText))
     return edge
 end
 
@@ -219,7 +258,7 @@ local FACE_BUTTON_COLORS = { A = "buttonA", B = "buttonB", X = "buttonX", Y = "b
 function Widgets.ButtonChip(tree, name, label)
     local role = FACE_BUTTON_COLORS[label]
     if not role then return Widgets.KeyChip(tree, name, label) end
-    local box = Widgets.SizeBox(tree, name .. "Box", 16, 16)
+    local box = Widgets.SizeBox(tree, name .. "Box", 18, 18)
     local disc = Widgets.Border(tree, name .. "Disc", Widgets.COLORS[role])
     Widgets.Round(disc, nil)
     try(function() disc:SetHorizontalAlignment(Widgets.CENTER) end)

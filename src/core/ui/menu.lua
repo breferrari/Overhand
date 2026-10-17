@@ -33,8 +33,12 @@ local TRANSPARENT = Widgets.TRANSPARENT
 local FILL, START, CENTER, END = Widgets.FILL, Widgets.START, Widgets.CENTER, Widgets.END
 local try, isValid = Unreal.Try, Unreal.IsValid
 
+-- Sizes are the design's pixels at 1080p; font sizes are points (3/4 of the design's pixels).
+-- MENU_SCALE enlarges the whole menu evenly.
+local MENU_SCALE = 1.1
 local WIDTH = 480
 local SIDE_PADDING = 22
+local ROW_PADDING = 8
 local SELECTION_BAR_WIDTH = 3
 local CONTROL_WIDTH = 124      -- toggles and choices line up on the right
 local VALUE_WIDTH = 88         -- a choice's value between its arrows
@@ -45,11 +49,11 @@ local POSITION = { X = 40, Y = 40 }
 local REFERENCE_HEIGHT = 1080
 local REFRESH_INTERVAL = 0.25
 local GAME_MENU_CHECK_INTERVAL = 0.5
-local DESCRIPTION_MIN_HEIGHT = 32
+local DESCRIPTION_MIN_HEIGHT = 40
 
 local FONT_SIZE = {
-    title = 18, subtitle = 9, tab = 10, tabCount = 7, section = 10, row = 13, subRow = 12,
-    toggle = 8, arrow = 13, info = 10, descriptionTitle = 8, description = 11, footer = 10, hint = 9,
+    title = 16.5, subtitle = 9, tab = 10, tabCount = 7, section = 10, row = 12, subRow = 11.5,
+    toggle = 8.5, arrow = 9, info = 9, descriptionTitle = 8.5, description = 10.5, footer = 9, hint = 9,
 }
 
 -- The footer's buttons for each input device. A hint with a verb is only shown when the selected
@@ -82,7 +86,8 @@ local config = {
 --            buttonIcons = { A = "/Game/.../T_A.T_A", ... },
 --            theme = { subtitle = "GAME NAME", mark = "assets/mark.png" (in the mod folder),
 --                      palette = { role = "#RRGGBB" } (core/ui/widgets.lua), panelOpacity,
---                      fonts = { display = "/Game/.../Font.Font" } (title and sections) } }
+--                      fonts = { display = font, body = font } (a font is an object path or a
+--                      list of name fragments, see Widgets.ResolveFonts; display: title, sections) } }
 function Menu.Configure(options)
     for key, value in pairs(options) do config[key] = value end
     Input.Configure({ controller = config.controller, player = config.player })
@@ -294,8 +299,6 @@ end
 -- Building the widgets
 -- ---------------------------------------------------------------------------
 
-local function displayFont() return config.theme.fonts and config.theme.fonts.display end
-
 -- A rule that takes the rest of a horizontal box, centred on the line.
 local function addRule(tree, line, name, color, left, right)
     local rule = Widgets.Bar(tree, name, color, nil, 1)
@@ -370,7 +373,7 @@ local function buildRow(tree, page, name, item)
     local content = Widgets.HorizontalBox(tree, name .. "Content")
     local contentSlot = line:AddChild(content)
     Widgets.Fill(contentSlot)
-    Widgets.Pad(contentSlot, SIDE_PADDING - SELECTION_BAR_WIDTH, 5, SIDE_PADDING, 5)
+    Widgets.Pad(contentSlot, SIDE_PADDING - SELECTION_BAR_WIDTH, ROW_PADDING, SIDE_PADDING, ROW_PADDING)
 
     local function add(widget, left, right)
         local slot = content:AddChild(widget)
@@ -415,10 +418,10 @@ end
 local function buildSection(tree, page, name, title, isFirst)
     local line = Widgets.HorizontalBox(tree, name)
     local text = Widgets.Text(tree, name .. "Title", title, FONT_SIZE.section, COLORS.accent,
-        { bold = true, spacing = 120, font = displayFont() })
+        { bold = true, spacing = 120, display = true })
     Widgets.CenterVertically(line:AddChild(text))
     addRule(tree, line, name .. "Rule", COLORS.edge, 12, 0)
-    Widgets.Pad(page:AddChild(line), SIDE_PADDING, isFirst and 4 or 14, SIDE_PADDING, 4)
+    Widgets.Pad(page:AddChild(line), SIDE_PADDING, isFirst and 4 or 16, SIDE_PADDING, 6)
 end
 
 local function buildPage(tree, column, tabIndex, tab)
@@ -436,7 +439,7 @@ local function buildPage(tree, column, tabIndex, tab)
             rows[index] = buildRow(tree, page, name, item)
         end
     end
-    Widgets.Pad(column:AddChild(page), 0, 10, 0, 10)
+    Widgets.Pad(column:AddChild(page), 0, 12, 0, 12)
     Widgets.SetVisible(page, false)
     return { box = page, rows = rows }
 end
@@ -459,7 +462,7 @@ local function buildHeader(tree, column, controller)
     Widgets.CenterVertically(markSlot)
     Widgets.Pad(markSlot, 0, 0, 10, 0)
     local title = Widgets.Text(tree, "Title", App.menuTitle, FONT_SIZE.title, COLORS.title,
-        { bold = true, spacing = 80, font = displayFont() })
+        { bold = true, spacing = 80, display = true })
     Widgets.CenterVertically(titleLine:AddChild(title))
     addRule(tree, titleLine, "TitleRule", COLORS.hairline, 12, config.theme.subtitle and 12 or 0)
     if config.theme.subtitle then
@@ -475,7 +478,7 @@ local function buildHeader(tree, column, controller)
             local dot = Widgets.Text(tree, "TabDot" .. index, "·", FONT_SIZE.tab, COLORS.edge, { bold = true })
             local dotSlot = tabLine:AddChild(dot)
             Widgets.CenterVertically(dotSlot)
-            Widgets.Pad(dotSlot, 9, 0, 9, 0)
+            Widgets.Pad(dotSlot, 10, 0, 10, 0)
         end
         local label = Widgets.Text(tree, "Tab" .. index, tab.title:upper(), FONT_SIZE.tab, COLORS.dim, { bold = true, spacing = 120 })
         Widgets.CenterVertically(tabLine:AddChild(label))
@@ -487,15 +490,15 @@ local function buildHeader(tree, column, controller)
     end
     local tabSlot = header:AddChild(tabLine)
     Widgets.Align(tabSlot, CENTER, nil)
-    Widgets.Pad(tabSlot, 0, 12, 0, 0)
+    Widgets.Pad(tabSlot, 0, 14, 0, 0)
 
-    Widgets.Pad(column:AddChild(header), SIDE_PADDING, 16, SIDE_PADDING, 12)
+    Widgets.Pad(column:AddChild(header), SIDE_PADDING, 18, SIDE_PADDING, 14)
     column:AddChild((Widgets.Bar(tree, "HeaderLine", COLORS.edge, nil, 1)))
     return tabWidgets
 end
 
 local function buildDescription(tree, column)
-    local panel = Widgets.Border(tree, "Description", COLORS.descriptionPanel, { 14, 9, 14, 10 })
+    local panel = Widgets.Border(tree, "Description", COLORS.descriptionPanel, { 14, 12, 14, 12 })
     local stack = Widgets.VerticalBox(tree, "DescriptionStack")
     panel:SetContent(stack)
     local titleLine = Widgets.HorizontalBox(tree, "DescriptionTitleLine")
@@ -509,7 +512,7 @@ local function buildDescription(tree, column)
     try(function() bodyBox:SetMinDesiredHeight(DESCRIPTION_MIN_HEIGHT) end)
     local body = Widgets.Text(tree, "DescriptionBody", "", FONT_SIZE.description, COLORS.label, { wrap = true })
     bodyBox:SetContent(body)
-    Widgets.Pad(stack:AddChild(bodyBox), 0, 5, 0, 0)
+    Widgets.Pad(stack:AddChild(bodyBox), 0, 6, 0, 0)
 
     local outline = Widgets.Outlined(tree, "DescriptionOutline", panel, COLORS.descriptionEdge)
     Widgets.Pad(column:AddChild(outline), SIDE_PADDING, 0, SIDE_PADDING, 14)
@@ -526,15 +529,13 @@ local function buildHint(tree, row, name, hint)
             or Widgets.ButtonChip(tree, name .. "Key" .. index, key)
         local slot = group:AddChild(keyWidget)
         Widgets.CenterVertically(slot)
-        Widgets.Pad(slot, 0, 0, 3, 0)
+        Widgets.Pad(slot, 0, 0, 4, 0)
     end
     local label = Widgets.Text(tree, name .. "Label", hint.label or "", FONT_SIZE.hint, COLORS.muted)
-    local labelSlot = group:AddChild(label)
-    Widgets.CenterVertically(labelSlot)
-    Widgets.Pad(labelSlot, 2, 0, 0, 0)
+    Widgets.CenterVertically(group:AddChild(label))
     local groupSlot = row:AddChild(group)
     Widgets.CenterVertically(groupSlot)
-    Widgets.Pad(groupSlot, 12, 0, 0, 0)
+    Widgets.Pad(groupSlot, 10, 0, 0, 0)
     return { group = group, label = label, verb = hint.verb }
 end
 
@@ -550,8 +551,8 @@ end
 -- Status · N changed on the left, the buttons on the right.
 local function buildFooter(tree, column)
     column:AddChild((Widgets.Bar(tree, "FooterLine", COLORS.edge, nil, 1)))
-    local footer = Widgets.Border(tree, "Footer", COLORS.footer, { SIDE_PADDING, 8, SIDE_PADDING, 8 })
-    local line = Widgets.HorizontalBox(tree, "FooterLine")
+    local footer = Widgets.Border(tree, "Footer", COLORS.footer, { SIDE_PADDING, 10, SIDE_PADDING, 10 })
+    local line = Widgets.HorizontalBox(tree, "FooterRow")
     footer:SetContent(line)
     local statusLine = Widgets.HorizontalBox(tree, "StatusLine")
     local status = Widgets.Text(tree, "Status", "", FONT_SIZE.footer, COLORS.highlight)
@@ -560,7 +561,7 @@ local function buildFooter(tree, column)
     Widgets.CenterVertically(statusLine:AddChild(status))
     local separatorSlot = statusLine:AddChild(separator)
     Widgets.CenterVertically(separatorSlot)
-    Widgets.Pad(separatorSlot, 7, 0, 7, 0)
+    Widgets.Pad(separatorSlot, 8, 0, 8, 0)
     Widgets.CenterVertically(statusLine:AddChild(count))
     local statusSlot = line:AddChild(statusLine)
     Widgets.Fill(statusSlot)
@@ -592,6 +593,7 @@ local function build(controller)
     root.WidgetTree = tree
     local canvas = Widgets.Construct("/Script/UMG.CanvasPanel", tree, "Canvas")
     tree.RootWidget = canvas
+    Widgets.ResolveFonts(config.theme.fonts)
 
     local panel = Widgets.Border(tree, "Panel", COLORS.panel)
     local widthBox = Widgets.SizeBox(tree, "Width")
@@ -627,8 +629,8 @@ local function applyScale(controller)
     local layout = Unreal.WidgetLayoutLibrary()
     local height = Unreal.TryNumber(function() return layout:GetViewportSize(controller).Y end)
     local dpiScale = Unreal.TryNumber(function() return layout:GetViewportScale(controller) end)
-    local scale = 1
-    if height and height > 0 and dpiScale and dpiScale > 0 then scale = (height / REFERENCE_HEIGHT) / dpiScale end
+    local scale = MENU_SCALE
+    if height and height > 0 and dpiScale and dpiScale > 0 then scale = MENU_SCALE * (height / REFERENCE_HEIGHT) / dpiScale end
     local widgets = view.widgets
     try(function() widgets.frame:SetRenderTransformPivot({ X = 0.0, Y = 0.0 }) end)
     try(function() widgets.frame:SetRenderScale({ X = scale, Y = scale }) end)
@@ -677,17 +679,12 @@ local function drawToggle(row, item)
     end)
 end
 
-local function drawChoice(row, item, isSelected)
+local function drawChoice(row, item)
     local choice, shown = row.choice, row.shown
     setText(shown, "value", choice.value, choiceText(item))
     -- a setting at its vanilla value reads quieter than a changed one
     local quiet = item.isChanged ~= nil and not item.isChanged()
     setTextColor(shown, "valueColor", choice.value, quiet and COLORS.muted or COLORS.title)
-    local arrowColor = isSelected and COLORS.highlight or COLORS.faint
-    update(shown, "arrowColor", arrowColor, function()
-        Widgets.SetTextColor(choice.left, arrowColor)
-        Widgets.SetTextColor(choice.right, arrowColor)
-    end)
     if row.slider then
         local options = optionsOf(item)
         local maximum = math.max(#options, 2)
@@ -723,7 +720,7 @@ local function drawRow(row, item, isSelected)
     if row.toggle then
         drawToggle(row, item)
     elseif row.choice then
-        drawChoice(row, item, isSelected)
+        drawChoice(row, item)
     else
         drawAction(row, item, isSelected)
     end

@@ -6,6 +6,8 @@ return {
     subtitle = "VALOR MORTIS",
     mark = "assets/mark.png",   -- the blood handprint, in the mod folder
     panelOpacity = 0.97,
+    -- The design's fonts, used if the game has them loaded (Misc > Find fonts lists what it has).
+    fonts = { display = { "Cinzel" }, body = { "Barlow" } },
     palette = {
         panel = "#14100E",
         edge = "#3A302A",

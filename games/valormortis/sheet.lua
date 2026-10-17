@@ -9,6 +9,7 @@ local Settings = require("core.settings")
 local BugReport = require("core.bug_report")
 local Menu = require("core.ui.menu")
 local IconFinder = require("core.ui.icon_finder")
+local FontFinder = require("core.ui.font_finder")
 local Game = require("game.game")
 local Combat = require("game.features.combat")
 local Resources = require("game.features.resources")
@@ -220,6 +221,8 @@ local function miscTab()
             "Writes " .. App.name .. "-BugReport.txt into the mod folder: settings, game state and the last log lines." }),
         Menu.Action("Find controller button icons", IconFinder.WriteReport, { description =
             "Lists the game's controller button images in " .. App.name .. "-ButtonIcons.txt, so the menu can use them." }),
+        Menu.Action("Find fonts", FontFinder.WriteReport, { description =
+            "Lists the game's loaded fonts in " .. App.name .. "-Fonts.txt, so the menu can use them." }),
         Menu.Info(function() return App.name .. " v" .. App.version end),
     }
 end
