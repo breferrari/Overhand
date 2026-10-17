@@ -8,6 +8,7 @@
         Scripts\core\            src\core\
         Scripts\gas\             src\gas\            (only when the manifest says usesGas)
         Scripts\game\            games\<game>\       (without manifest.json)
+        assets\                 assets\             (the menu's mark)
         enabled.txt, LICENSE
     then copies it into <gameDir>\<modsPath>\<modName>\, keeping settings.cfg and teleports.txt.
 
@@ -53,6 +54,7 @@ Copy-Item (Join-Path $repo "src\core") $scripts -Recurse
 if ($manifest.usesGas) { Copy-Item (Join-Path $repo "src\gas") $scripts -Recurse }
 Copy-Item $gameSource (Join-Path $scripts "game") -Recurse
 Remove-Item (Join-Path $scripts "game\manifest.json")
+Copy-Item (Join-Path $repo "assets") $build -Recurse
 New-Item -ItemType File (Join-Path $build "enabled.txt") | Out-Null
 Copy-Item (Join-Path $repo "LICENSE") $build
 "Built $build"

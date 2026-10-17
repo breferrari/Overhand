@@ -1,23 +1,14 @@
 # Overhand
 
+![Overhand](docs/images/banner.png)
+
 **In-game cheat menus for Unreal Engine games, built on UE4SS.** One menu, every cheat, nothing running that you didn't switch on.
 
 Press **F5** (or **L3 + R3** on a controller), pick a tab, change a value. Every cheat can be switched off at any time and puts the game back to vanilla when you do. Your choices are saved for the next session.
 
-```
-OVERHAND
-SURVIVAL   MOVEMENT   COMBAT   ITEMS   GIVE   MISC
-──────────────────────────────────────────────────
-  God Mode                                     OFF
-  Infinite Stamina                     <  ON  >
-    ...only out of combat                      OFF
-  Damage Taken                               50%
-HEALTH REGENERATION
-  Regeneration                          5 HP / s
+<p align="center"><img src="docs/images/menu.png" width="480" alt="The Overhand menu in Valor Mortis"></p>
 
-Ready
-[Up][Down] select  [Left][Right] change  [Enter] use  [Q][E] tab  [F5] close
-```
+Every row says what it does while it's selected, rows changed from vanilla carry a red mark (and each tab counts them), and the footer shows only the buttons that do something on the selected row. Each game brings its own theme; this is Valor Mortis'. (The image is the design; in game the menu uses the engine's font.)
 
 One repo holds the shared framework and every supported game. Installing builds a mod for **one** game from only what that game needs.
 
@@ -41,7 +32,7 @@ Adding a game: [docs/PORTING.md](docs/PORTING.md) (worked example: Atomic Heart)
 | **Esc** | **B** | close |
 | **Mouse** | | drag the slider on long lists |
 
-The hint row at the bottom shows the keys of the device you opened the menu with, drawn as keycaps (or the game's own button icons, once mapped). While the menu is open your character doesn't move, look around or act. The menu won't open over a game menu, and closes itself when one appears. Risky one-way actions need **Enter (or A) twice**.
+The footer shows the buttons of the device you opened the menu with (or the game's own button icons, once mapped), and only those that do something on the selected row. While the menu is open your character doesn't move, look around or act. The menu won't open over a game menu, and closes itself when one appears. Risky one-way actions need **Enter (or A) twice**.
 
 ## Install
 
@@ -65,6 +56,7 @@ Scripts\main.lua    src\main.lua
 Scripts\core\       src\core\
 Scripts\gas\        src\gas\           (only for games that use GAS)
 Scripts\game\       games\<game>\      (only that game)
+assets\             assets\            (the menu's mark)
 ```
 
 A game update or a Game Pass / Steam "repair" can remove UE4SS and the mod; install again afterwards. Your `settings.cfg` and teleports are kept across installs. The game's `manifest.json` lists other mods Overhand replaces (they are switched off, not deleted) and earlier folder names to take settings from.
@@ -86,7 +78,7 @@ All inside `Mods\Overhand\`:
 | Tab | Cheats |
 |---|---|
 | **Survival** | God Mode · Infinite Stamina (optionally only out of combat) · Infinite Nephtoglobin · Fall Damage 100–0 % · Damage Taken 100–10 % (through the game's own resistances) · Max Health up to 5x (the health bar keeps its length) · Health Regeneration 1–50 HP/s with a delay after hits, a heal-up-to limit and an out-of-combat option |
-| **Movement** | NoClip (Space up, Ctrl down) · Movement Speed up to 5x · Jump Height up to 10x · Game Speed 0.25–2x · Toggle Sprint for keyboard · Instant Sprint · **Teleport**: 5 saved positions per area |
+| **Movement** | NoClip (Space or A up, Ctrl, C or B down) · Movement Speed up to 5x · Jump Height up to 10x · Game Speed 0.25–2x · Toggle Sprint for keyboard · Instant Sprint · **Teleport**: 5 saved positions per area |
 | **Combat** | One-Hit Kills · Damage Multiplier up to 10x · Every Block Is A Perfect Parry · Parry Window 0.5–6x · Dodge Window 0.5–4x · Kill All Enemies Nearby (60 m) |
 | **Items** | Infinite Ammo · Infinite Healing Flasks · Infinite Consumables · Infinite Buffs (potions, coatings, pistol boosts) · No Item Cooldowns · Keep Catalysts On Death · No Ability Costs · Refill Everything |
 | **Give** | +1,000 / +10,000 Catalysts · +99 of every upgrade material · +5 of every consumable · Unlock all weapons / abilities / gems · **Give Item**: any consumable, material or instant item, 1–999 at a time (story items are left out so quests can't break) |
@@ -133,7 +125,7 @@ For every game the smoke test assembles the mod the way the installer does, comp
 ## Credits
 
 - Parts of the Valor Mortis cheat logic come from **Valor Mortis Cheat Menu** 1.3.2 by BryanHudson (MIT).
-- Valor Mortis Health Regeneration (healing through the game's attribute system, the combat check), Damage Taken (raising resistances) and the menu style follow **AeonGreyh**'s Passive Health Regen and Defense Multiplier, reimplemented here.
+- Valor Mortis Health Regeneration (healing through the game's attribute system, the combat check) and Damage Taken (raising resistances) follow **AeonGreyh**'s Passive Health Regen and Defense Multiplier, reimplemented here.
 - [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) by the UE4SS-RE team (MIT).
 
 ## License

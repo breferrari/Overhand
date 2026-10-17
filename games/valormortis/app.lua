@@ -5,7 +5,7 @@ local App = require("core.app")
 
 App.Define({
     name = "Overhand",
-    version = "1.4.0",
+    version = "1.5.0",
     menuTitle = "OVERHAND",
     status = "Waiting for a loaded save...",
     settings = {

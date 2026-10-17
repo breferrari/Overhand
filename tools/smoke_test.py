@@ -43,6 +43,7 @@ def assemble(game: str, manifest: dict, into: pathlib.Path) -> pathlib.Path:
     if manifest.get("usesGas"):
         shutil.copytree(SOURCE / "gas", scripts / "gas")
     shutil.copytree(GAMES / game, scripts / "game", ignore=shutil.ignore_patterns("manifest.json"))
+    shutil.copytree(REPO / "assets", mod / "assets")
     return mod
 
 

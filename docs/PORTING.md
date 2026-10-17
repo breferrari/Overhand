@@ -43,7 +43,8 @@ games/atomicheart/
   init.lua        wiring (start from valormortis/init.lua and trim)
   app.lua         App.Define: version, menu title, settings with vanilla values
   game.lua        Controller(), Player(), and whatever access the cheats need
-  sheet.lua       the menu tabs
+  sheet.lua       the menu tabs (each row with a description)
+  theme.lua       the menu's colours, subtitle and mark (start from valormortis/theme.lua)
   features/       one module per feature group
 ```
 
@@ -117,6 +118,7 @@ Menu.Configure({
     isReady = function() return Game.Player() ~= nil end,
     gameMenuClasses = { "<PauseMenuWidgetClass>" },
     buttonIcons = {},
+    theme = require("game.theme"),
 })
 
 require("game.sheet").Build()
@@ -139,4 +141,5 @@ In the game: F5 or L3 + R3; check `Overhand.log` for "player found" and the feat
 
 - **Input mode with a controller.** In Valor Mortis the UI-only input mode stops controller buttons from reaching the game, so a controller-opened menu uses game-and-UI mode (`core/ui/input.lua`). Check the log's `controller:` lines in the new game.
 - **World detection.** The runner starts a new world when the identity object (the player character) changes. If a game reuses the pawn across loads, give `Runner.Configure` a different identity (e.g. the world or game state).
+- **Theme.** Pick colours from the game's own UI: a dark panel, a text colour, one accent for what is on, one for what is selected. Roles are listed in `core/ui/widgets.lua`; anything left out keeps the neutral default. The mark is loaded from a PNG with the engine's `ImportFileAsTexture2D`; if that fails the menu draws a small diamond (the log says which).
 - **Menu scaling** assumes a 1080p layout scaled to the viewport, which suits most games.

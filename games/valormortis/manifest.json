@@ -11,7 +11,7 @@
         "controllerClass": "BP_PlayerController_C",
         "playerClass": "BP_PlayerCharacter_C",
         "tabCount": 6,
-        "expectLog": ["button icons:", "damage taken:"],
+        "expectLog": ["button icons:", "damage taken:", "menu mark: assets/mark.png"],
         "expectDefaults": ["godMode=false", "regenPerSecond=0", "debugLogging=false"],
         "expectAbsentDefaults": ["noClip="]
     }

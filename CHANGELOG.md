@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.5.0 (2026-10-17): its own look
+
+- **New menu design**, Overhand's own (no longer modelled on AeonGreyh's menus):
+  - header with the blood-handprint mark, the title and the game's name; the tabs are centred, each with a count of its rows changed from vanilla
+  - toggles as OFF | ON (ON lit in the accent), choices as ‹ value ›; vanilla values read quieter than changed ones; every row changed from vanilla has a red mark
+  - sub-rows ("only out of combat", the regeneration options) drawn under their parent with a connector
+  - a description of the selected row; every Valor Mortis row has one
+  - footer: what just changed ("Damage Taken: 50%"), how many settings differ from vanilla, and only the buttons that do something on the selected row ("A turn off", "D-pad change"); face buttons drawn as coloured discs
+  - the frame has brass corner ticks; only what changed is redrawn, as before
+- **Themes per game:** `games/<game>/theme.lua` (palette by role in sRGB hex, subtitle, mark, optional display font), passed with `Menu.Configure({ theme = ... })`. Valor Mortis: soot, parchment, crimson, brass.
+- **Mark:** `assets/mark.png` is installed with the mod and loaded with the engine's `ImportFileAsTexture2D`; if that fails the menu draws a small diamond. The log says which (`menu mark:`).
+- README: banner and a picture of the menu design.
+
 ## 1.4.0 (2026-10-17): Overhand
 
 - **Renamed to Overhand** (was ValorianSheet). The installed folder is `Mods\Overhand\`; the install script takes `settings.cfg` and `teleports.txt` from `Mods\ValorianSheet\` and removes that folder. Logs and reports are `Overhand.log`, `Overhand-BugReport.txt`, `Overhand-ButtonIcons.txt`.

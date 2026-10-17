@@ -52,6 +52,7 @@ Menu.Configure({
     -- The game's own button images, by chip label (find candidates with Misc > Find controller
     -- button icons). Chips are drawn for every button without one.
     buttonIcons = {},
+    theme = require("game.theme"),
 })
 
 local function attributeLine(setName, attributeNames)

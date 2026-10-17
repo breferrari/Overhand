@@ -19,6 +19,7 @@ Scripts/main.lua    src/main.lua
 Scripts/core/       src/core/
 Scripts/gas/        src/gas/          (only when manifest.json says usesGas)
 Scripts/game/       games/<game>/     (without manifest.json)
+assets/             assets/           (the menu's mark, shared by every game)
 ```
 
 UE4SS loads `Scripts/main.lua`; everything else is a module loaded with `require`, resolved from `Scripts/` (`require("core.ui.menu")` is `Scripts/core/ui/menu.lua`). A game's own modules are always required as `game.*` (`require("game.features.health")`), so game code never knows its folder name in the repo. The smoke test assembles every game the same way.
@@ -67,8 +68,8 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 | `override.lua` | Change a game value and put the vanilla value back later, even when the game changes it in between. What is changed is an accessor (read/write, saved or not): `Override.PROPERTY` here, GAS attributes in `gas/`. |
 | `runner.lua` | The per-tick loop for the game's features: detects a new player character (new world), runs once-per-world checks, ticks every feature guarded on its own. |
 | `bug_report.lua` | `<name>-BugReport.txt`: settings, the game's sections, recent log lines. |
-| `ui/menu.lua` | The menu framework: item kinds (toggle, choice, action, section, info), navigation, drawing, open/close, hint rows per input device. |
-| `ui/widgets.lua` | Building UMG widgets from Lua: text, borders, sliders, key chips, icons; colours. |
+| `ui/menu.lua` | The menu framework: item kinds (toggle, choice, action, section, info; sub-rows, descriptions), navigation, drawing only what changed, open/close. The layout: header (mark, title, game name, tabs with changed-row counts), rows (OFF \| ON toggles, ‹ value › choices, a mark on rows changed from vanilla), the selected row's description, a footer with the status, the changed count and the buttons that act on the selected row. |
+| `ui/widgets.lua` | Building UMG widgets from Lua: text, borders, outlines, bars, diamonds, sliders, key and face-button chips, icons, textures from PNG files; the theme (colour roles written as sRGB hex, converted to the linear colours UMG draws with). |
 | `ui/input.lua` | Keyboard queue, controller polling (L3 + R3, D-pad, A, B, LB, RB), blocking the game's input while the menu is open. |
 | `ui/game_menus.lua` | Is one of the game's own menus open? (classes from the game, cached widgets) |
 | `ui/icon_finder.lua` | Writes the loaded images that look like controller button prompts to a file, to map the game's own icons. |
@@ -86,7 +87,8 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 | `app.lua` | Name, version, menu title, every setting with its vanilla value. |
 | `game.lua` | Valor Mortis access: controller and player classes, components, attribute sets, subsystems, items, the developers' cheat manager. |
 | `shared.lua` | Runtime flags more than one feature reads (NoClip active, safe landing). |
-| `sheet.lua` | The menu content: six tabs and what each row is bound to. |
+| `sheet.lua` | The menu content: six tabs, what each row is bound to and what it does (its description). |
+| `theme.lua` | The menu's look for this game: palette, subtitle, mark (`assets/mark.png`), optional display font. |
 | `features/health.lua` | God Mode, Infinite Stamina / Nephtoglobin, Fall Damage, Max Health, Health Regeneration |
 | `features/defense.lua` | Damage Taken (raises the resistance attributes) |
 | `features/damage.lua` | Hooks on the game's damage functions: God Mode blocking, One-Hit Kills, Damage Multiplier |

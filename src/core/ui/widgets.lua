@@ -1,5 +1,6 @@
 -- core/ui/widgets.lua
--- Building plain UMG widgets from Lua (StaticConstructObject), and the menu's colours.
+-- Building plain UMG widgets from Lua (StaticConstructObject), and the menu's theme: colours by
+-- role, written as sRGB hex and turned into the linear colours UMG draws with.
 
 local Unreal = require("core.unreal")
 local App = require("core.app")
@@ -12,21 +13,59 @@ local try = Unreal.Try
 local SHOWN = 4        -- SelfHitTestInvisible: drawn, children (sliders) still take the mouse
 local COLLAPSED = 1
 
-Widgets.COLORS = {
-    frame = { R = 0.42, G = 0.40, B = 0.37, A = 0.95 },
-    background = { R = 0.012, G = 0.012, B = 0.014, A = 0.93 },
-    title = { R = 0.92, G = 0.90, B = 0.86, A = 1.0 },
-    accent = { R = 0.78, G = 0.04, B = 0.05, A = 1.0 },
-    label = { R = 0.66, G = 0.66, B = 0.64, A = 1.0 },
-    value = { R = 0.90, G = 0.90, B = 0.88, A = 1.0 },
-    muted = { R = 0.45, G = 0.45, B = 0.43, A = 1.0 },
-    status = { R = 0.80, G = 0.78, B = 0.70, A = 1.0 },
-    rowSelected = { R = 0.16, G = 0.0, B = 0.0016, A = 0.85 },
-    rowIdle = { R = 0.0, G = 0.0, B = 0.0, A = 0.0 },
-    sliderTrack = { R = 0.18, G = 0.18, B = 0.18, A = 1.0 },
-    chipEdge = { R = 0.38, G = 0.37, B = 0.35, A = 1.0 },
-    chipFace = { R = 0.09, G = 0.09, B = 0.10, A = 1.0 },
+-- EHorizontalAlignment / EVerticalAlignment
+Widgets.FILL, Widgets.START, Widgets.CENTER, Widgets.END = 0, 1, 2, 3
+
+-- "#RRGGBB" (sRGB, as a designer writes it) -> the linear FLinearColor UMG expects.
+function Widgets.Hex(hex, alpha)
+    local function channel(offset)
+        local value = tonumber(hex:sub(offset, offset + 1), 16) / 255
+        if value <= 0.04045 then return value / 12.92 end
+        return ((value + 0.055) / 1.055) ^ 2.4
+    end
+    return { R = channel(2), G = channel(4), B = channel(6), A = alpha or 1.0 }
+end
+
+-- The default theme (neutral greys). A game passes its own with Menu.Configure({ theme = ... }):
+-- any role it leaves out keeps the default.
+local DEFAULT_PALETTE = {
+    panel = "#141414",           -- the menu's background
+    edge = "#3A3A3A",            -- frame, header and footer lines
+    corner = "#B0B0B0",          -- the frame's corner ticks
+    footer = "#101010",          -- the status / hints bar
+    rowSelected = "#202020",     -- the selected row
+    selectionBar = "#B0B0B0",    -- the selected row's left edge
+    hairline = "#4A4A4A",        -- the header rule, idle toggle frames, sub-row connectors
+    title = "#E6E6E6",           -- the title and values that differ from vanilla
+    bright = "#F2F2F2",          -- the selected row's label, text on the accent
+    label = "#B0B0B0",           -- row labels
+    muted = "#8C8C8C",           -- sub-rows, vanilla values, the subtitle, hint labels
+    dim = "#6E6E6E",             -- inactive tabs
+    faint = "#5A5A5A",           -- arrows, the unlit half of a toggle
+    accent = "#C03030",          -- the active tab, section titles, ON, changed-from-vanilla marks
+    highlight = "#C8C8C8",       -- tab counts, the status line, the description title
+    toggleOff = "#2A2A2A",       -- the lit OFF half of a toggle
+    descriptionPanel = "#0F0F0F",
+    descriptionEdge = "#2A2A2A",
+    chipEdge = "#5A5A5A",        -- key / shoulder button outlines
+    chipText = "#D8D8D8",
+    buttonA = "#3E7A34",         -- controller face buttons
+    buttonB = "#9B2B2B",
+    buttonX = "#2F5E9E",
+    buttonY = "#B08A2E",
+    sliderTrack = "#2E2E2E",
 }
+
+Widgets.COLORS = {}
+Widgets.TRANSPARENT = { R = 0.0, G = 0.0, B = 0.0, A = 0.0 }
+
+-- palette: { role = "#RRGGBB", ... }; panelOpacity: the panel's alpha (the game shows through).
+function Widgets.ApplyTheme(palette, panelOpacity)
+    for role, hex in pairs(DEFAULT_PALETTE) do Widgets.COLORS[role] = Widgets.Hex((palette and palette[role]) or hex) end
+    Widgets.COLORS.panel.A = panelOpacity or 0.96
+end
+
+Widgets.ApplyTheme(nil)
 
 -- Widget names must be unique per outer; every build gets its own prefix.
 local buildNumber = 0
@@ -48,16 +87,26 @@ function Widgets.SetText(textBlock, text)
     try(function() textBlock:SetText(FText(text or "")) end)
 end
 
-function Widgets.Text(tree, name, text, fontSize, color)
+-- style (optional): { bold = true, spacing = 120 (thousandths of an em), font = "/Game/...Font",
+--                     center = true, wrap = true }
+function Widgets.Text(tree, name, text, fontSize, color, style)
+    style = style or {}
     local textBlock = Widgets.Construct("/Script/UMG.TextBlock", tree, name)
     Widgets.SetText(textBlock, text)
     try(function()
-        textBlock.Font.Size = fontSize
-        textBlock:SetFont(textBlock.Font)
+        local font = textBlock.Font
+        if style.font then
+            local fontObject = Unreal.Static(style.font)
+            if Unreal.IsValid(fontObject) then font.FontObject = fontObject end
+        end
+        font.Size = fontSize
+        if style.bold then font.TypefaceFontName = FName("Bold") end
+        if style.spacing then font.LetterSpacing = style.spacing end
+        textBlock:SetFont(font)
     end)
     Widgets.SetTextColor(textBlock, color)
-    try(function() textBlock:SetShadowColorAndOpacity({ SpecifiedColor = { R = 0, G = 0, B = 0, A = 0.85 }, ColorUseRule = 0 }) end)
-    try(function() textBlock:SetShadowOffset({ X = 1.0, Y = 1.0 }) end)
+    if style.center then try(function() textBlock:SetJustification(1) end) end   -- ETextJustify::Center
+    if style.wrap then try(function() textBlock:SetAutoWrapText(true) end) end
     return textBlock
 end
 
@@ -66,6 +115,24 @@ function Widgets.Border(tree, name, color, padding)
     try(function() border:SetBrushColor(color) end)
     if padding then Widgets.Pad(border, padding[1], padding[2], padding[3], padding[4]) end
     return border
+end
+
+function Widgets.SetColor(border, color) try(function() border:SetBrushColor(color) end) end
+
+-- Rounded corners on a border's brush (radius in slate units; nil: a pill / circle). Where the
+-- engine does not take it the border stays square.
+function Widgets.Round(border, radius)
+    try(function()
+        local brush = border.Background
+        brush.DrawAs = 4                                   -- ESlateBrushDrawType::RoundedBox
+        if radius then
+            brush.OutlineSettings.RoundingType = 0         -- FixedRadius
+            brush.OutlineSettings.CornerRadii = { X = radius, Y = radius, Z = radius, W = radius }
+        else
+            brush.OutlineSettings.RoundingType = 1         -- HalfHeightRadius
+        end
+        border:SetBrush(brush)
+    end)
 end
 
 function Widgets.SizeBox(tree, name, width, height)
@@ -77,31 +144,106 @@ end
 
 function Widgets.VerticalBox(tree, name) return Widgets.Construct("/Script/UMG.VerticalBox", tree, name) end
 function Widgets.HorizontalBox(tree, name) return Widgets.Construct("/Script/UMG.HorizontalBox", tree, name) end
+function Widgets.Overlay(tree, name) return Widgets.Construct("/Script/UMG.Overlay", tree, name) end
+
+-- A solid bar (a rule, an edge): a coloured border in a size box. Returns the box and the border.
+function Widgets.Bar(tree, name, color, width, height)
+    local box = Widgets.SizeBox(tree, name .. "Box", width, height)
+    local fill = Widgets.Border(tree, name, color)
+    box:SetContent(fill)
+    return box, fill
+end
+
+-- content inside a 1-unit outline drawn as four bars (so whatever is behind shows through the
+-- content, unlike a border filled with the outline colour). Returns the outline and its bars.
+function Widgets.Outlined(tree, name, content, color)
+    local overlay = Widgets.Overlay(tree, name)
+    Widgets.Pad(overlay:AddChild(content), 1, 1, 1, 1)
+    local sides = {
+        { "Top", nil, 1, Widgets.FILL, Widgets.START },
+        { "Bottom", nil, 1, Widgets.FILL, Widgets.END },
+        { "Left", 1, nil, Widgets.START, Widgets.FILL },
+        { "Right", 1, nil, Widgets.END, Widgets.FILL },
+    }
+    local bars = {}
+    for _, side in ipairs(sides) do
+        local box, fill = Widgets.Bar(tree, name .. side[1], color, side[2], side[3])
+        Widgets.Align(overlay:AddChild(box), side[4], side[5])
+        bars[#bars + 1] = fill
+    end
+    return overlay, bars
+end
+
+function Widgets.SetColors(borders, color)
+    for _, border in ipairs(borders) do Widgets.SetColor(border, color) end
+end
 
 -- Padding on a slot or a border (both have SetPadding).
 function Widgets.Pad(target, left, top, right, bottom)
     try(function() target:SetPadding({ Left = left, Top = top, Right = right, Bottom = bottom }) end)
 end
 
-function Widgets.CenterVertically(slot) try(function() slot:SetVerticalAlignment(2) end) end
+function Widgets.Align(slot, horizontal, vertical)
+    if horizontal then try(function() slot:SetHorizontalAlignment(horizontal) end) end
+    if vertical then try(function() slot:SetVerticalAlignment(vertical) end) end
+end
 
--- A key or button drawn as a small keycap: a light edge around a dark face with the label.
+function Widgets.CenterVertically(slot) Widgets.Align(slot, nil, Widgets.CENTER) end
+
+-- A box slot that takes the space left over.
+function Widgets.Fill(slot) try(function() slot:SetSize({ Value = 1.0, SizeRule = 1 }) end) end
+
+-- A small square turned 45 degrees. Returns the box and the square (to recolour).
+function Widgets.Diamond(tree, name, size, color)
+    local box, square = Widgets.Bar(tree, name, color, size, size)
+    try(function() square:SetRenderTransformAngle(45.0) end)
+    return box, square
+end
+
+-- A key or shoulder button drawn as an outlined cap with its label.
 function Widgets.KeyChip(tree, name, label)
-    local edge = Widgets.Border(tree, name .. "Edge", Widgets.COLORS.chipEdge, { 1, 1, 1, 1 })
-    local face = Widgets.Border(tree, name .. "Face", Widgets.COLORS.chipFace, { 6, 1, 6, 2 })
+    local colors = Widgets.COLORS
+    local edge = Widgets.Border(tree, name .. "Edge", colors.chipEdge, { 1, 1, 1, 1 })
+    local face = Widgets.Border(tree, name .. "Face", colors.footer, { 5, 0, 5, 1 })
+    Widgets.Round(edge, 3)
+    Widgets.Round(face, 2)
     edge:SetContent(face)
-    face:SetContent(Widgets.Text(tree, name .. "Label", label, 10, Widgets.COLORS.value))
+    face:SetContent(Widgets.Text(tree, name .. "Label", label, 9, colors.chipText, { bold = true }))
     return edge
 end
 
--- A texture drawn at size x size; nil when it cannot be set (the caller falls back to a chip).
-function Widgets.Icon(tree, name, texture, size)
-    local box = Widgets.SizeBox(tree, name .. "Box", size, size)
+local FACE_BUTTON_COLORS = { A = "buttonA", B = "buttonB", X = "buttonX", Y = "buttonY" }
+
+-- A controller face button (A / B / X / Y) as a coloured disc with its letter; any other label is
+-- a key chip.
+function Widgets.ButtonChip(tree, name, label)
+    local role = FACE_BUTTON_COLORS[label]
+    if not role then return Widgets.KeyChip(tree, name, label) end
+    local box = Widgets.SizeBox(tree, name .. "Box", 16, 16)
+    local disc = Widgets.Border(tree, name .. "Disc", Widgets.COLORS[role])
+    Widgets.Round(disc, nil)
+    try(function() disc:SetHorizontalAlignment(Widgets.CENTER) end)
+    try(function() disc:SetVerticalAlignment(Widgets.CENTER) end)
+    disc:SetContent(Widgets.Text(tree, name .. "Label", label, 9, Widgets.COLORS.bright, { bold = true }))
+    box:SetContent(disc)
+    return box
+end
+
+-- A texture drawn at width x height; nil when it cannot be set (the caller falls back).
+function Widgets.Icon(tree, name, texture, width, height)
+    local box = Widgets.SizeBox(tree, name .. "Box", width, height or width)
     local image = Widgets.Construct("/Script/UMG.Image", tree, name)
     local ok = try(function() image:SetBrushFromTexture(texture, false) return true end)
     if not ok then return nil end
     box:SetContent(image)
     return box
+end
+
+-- A PNG / JPG from disk as a texture (the engine's own importer), or nil.
+function Widgets.TextureFromFile(path, worldContext)
+    local library = Unreal.Static("/Script/Engine.Default__KismetRenderingLibrary")
+    local texture = Unreal.IsValid(library) and try(function() return library:ImportFileAsTexture2D(worldContext, path) end)
+    return Unreal.IsValid(texture) and texture or nil
 end
 
 function Widgets.Slider(tree, name, minimum, maximum, value, width)
