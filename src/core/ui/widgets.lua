@@ -19,8 +19,10 @@ local COLLAPSED = 1
 -- EHorizontalAlignment / EVerticalAlignment
 Widgets.FILL, Widgets.START, Widgets.CENTER, Widgets.END = 0, 1, 2, 3
 
--- "#RRGGBB" (sRGB, as a designer writes it) -> the linear FLinearColor UMG expects.
+-- "#RRGGBB" (sRGB, as a designer writes it) -> the linear FLinearColor UMG expects; nil when it is
+-- not a colour written that way.
 function Widgets.Hex(hex, alpha)
+    if type(hex) ~= "string" or not hex:match("^#%x%x%x%x%x%x$") then return nil end
     local function channel(offset)
         local value = tonumber(hex:sub(offset, offset + 1), 16) / 255
         if value <= 0.04045 then return value / 12.92 end
@@ -61,9 +63,15 @@ local DEFAULT_PALETTE = {
 Widgets.COLORS = {}
 Widgets.TRANSPARENT = { R = 0.0, G = 0.0, B = 0.0, A = 0.0 }
 
--- palette: { role = "#RRGGBB", ... }; panelOpacity: the panel's alpha (the game shows through).
+-- palette: { role = "#RRGGBB", ... }; panelOpacity: the panel's alpha (the game shows through). A
+-- colour that is not "#RRGGBB" keeps the default (and is logged).
 function Widgets.ApplyTheme(palette, panelOpacity)
-    for role, hex in pairs(DEFAULT_PALETTE) do Widgets.COLORS[role] = Widgets.Hex((palette and palette[role]) or hex) end
+    for role, hex in pairs(DEFAULT_PALETTE) do
+        local themed = palette and palette[role]
+        local color = themed and Widgets.Hex(themed)
+        if themed and not color then Log.Info("theme: " .. role .. " = " .. tostring(themed) .. " is not #RRGGBB; using the default") end
+        Widgets.COLORS[role] = color or Widgets.Hex(hex)
+    end
     Widgets.COLORS.panel.A = panelOpacity or 0.96
 end
 
@@ -99,11 +107,15 @@ end
 -- Without one, text uses the engine's default font (Roboto).
 Widgets.fonts = {}
 
--- A font spec is either { faces = { Regular = "Cinzel-SemiBold", Bold = "Cinzel-Bold" } } (font
--- files the installer put in the game's Content folder; core/ui/fonts.lua builds the font) or the
--- path of a font the game has ("/Game/UI/Fonts/F_Title.F_Title").
+-- A font spec is either { faces = { Regular = "Cinzel-SemiBold", Bold = "Cinzel-Bold" } } (.ttf
+-- files in the mod's assets/fonts/; core/ui/fonts.lua builds the font) or the path of a font the
+-- game has ("/Game/UI/Fonts/F_Title.F_Title").
 local function findFont(role, spec)
-    if type(spec) == "string" then return Unreal.FindObject(spec) end
+    if type(spec) == "string" then
+        local font = Unreal.FindObject(spec)
+        if not font then Log.Info("menu fonts: " .. role .. " stays on the engine font (" .. spec .. " is not loaded)") end
+        return font
+    end
     local font, reason = Fonts.Build(role:sub(1, 1):upper() .. role:sub(2), spec.faces)
     if not font then Log.Info("menu fonts: " .. role .. " stays on the engine font (" .. tostring(reason) .. ")") end
     return font
@@ -118,7 +130,8 @@ function Widgets.ResolveFonts(specs)
 end
 
 -- The typeface for a weight ("Regular", "Medium", "SemiBold", "Bold"). The theme's fonts have them
--- all; the engine's Roboto only has Regular and Bold, so the others map to the nearest.
+-- all; the engine's Roboto only has Regular and Bold, so the others map to the nearest. (A game font
+-- named by path gets the weight's name as it is; one without that typeface shows its first.)
 local function typefaceFor(weight, display)
     if Widgets.fonts[display and "display" or "body"] then return weight end
     return (weight == "SemiBold" or weight == "Bold") and "Bold" or "Regular"
@@ -298,12 +311,15 @@ function Widgets.TextureFromFile(path, worldContext)
     return Unreal.IsValid(texture) and texture or nil
 end
 
--- The menu's own images (white, tinted when drawn): assets/<name>.png in the mod folder. Imported
--- once and kept while the textures stay valid. A missing image leaves its widget to a fallback.
+-- The menu's own images (the arrows and disc are white, tinted when drawn), PNGs in the mod folder,
+-- plus any the caller adds (the theme's mark). Imported once and kept while the textures stay valid.
+-- A missing image leaves its widget to a fallback.
 local IMAGE_FILES = { arrowLeft = "assets/arrow-left.png", arrowRight = "assets/arrow-right.png", disc = "assets/disc.png" }
 Widgets.images = {}
 
-function Widgets.LoadImages(worldContext)
+-- extraFiles: { key = "file in the mod folder" }, e.g. { mark = theme.mark }.
+function Widgets.LoadImages(worldContext, extraFiles)
+    for key, file in pairs(extraFiles or {}) do IMAGE_FILES[key] = file end
     for key, file in pairs(IMAGE_FILES) do
         if not Unreal.IsValid(Widgets.images[key]) then
             Widgets.images[key] = Widgets.TextureFromFile(Paths.InModFolder(file), worldContext)

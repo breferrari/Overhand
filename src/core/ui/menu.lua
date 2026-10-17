@@ -22,7 +22,6 @@
 local Unreal = require("core.unreal")
 local Log = require("core.log")
 local App = require("core.app")
-local Paths = require("core.paths")
 local Settings = require("core.settings")
 local Widgets = require("core.ui.widgets")
 local Input = require("core.ui.input")
@@ -487,25 +486,23 @@ local function buildPage(tree, column, tabIndex, tab)
 end
 
 -- The theme's mark (a PNG in the mod folder), or a small diamond in the accent colour.
-local function buildMark(tree, controller)
-    local markFile = config.theme.mark
-    local texture = markFile and Widgets.TextureFromFile(Paths.InModFolder(markFile), controller)
-    local icon = Widgets.Icon(tree, "Mark", texture, MARK_SIZE)
-    Log.Limited("menu mark", 1, "menu mark: " .. (icon and markFile or "diamond (no image loaded)"))
+local function buildMark(tree)
+    local icon = Widgets.Icon(tree, "Mark", Widgets.images.mark, MARK_SIZE)
+    Log.Limited("menu mark", 1, "menu mark: " .. (icon and config.theme.mark or "diamond (no image loaded)"))
     return icon or (Widgets.Diamond(tree, "MarkDiamond", 8, COLORS.accent))
 end
 
--- Mark, title, rule, game name.
-local function buildTitleLine(tree, controller)
+-- Mark, title, rule, game name. Returns the line and the title.
+local function buildTitleLine(tree)
     local line = Widgets.HorizontalBox(tree, "TitleLine")
-    addCentered(line, buildMark(tree, controller), 0, 10)
-    addCentered(line, Widgets.Text(tree, "Title", App.menuTitle, FONT_SIZE.title, COLORS.title,
-        { weight = "Bold", spacing = 80, display = true }))
+    addCentered(line, buildMark(tree), 0, 10)
+    local title = Widgets.Text(tree, "Title", App.menuTitle, FONT_SIZE.title, COLORS.title, { weight = "Bold", spacing = 80, display = true })
+    addCentered(line, title)
     addRule(tree, line, "TitleRule", COLORS.hairline, 12, config.theme.subtitle and 12 or 0)
     if config.theme.subtitle then
         addCentered(line, Widgets.Text(tree, "Subtitle", config.theme.subtitle, FONT_SIZE.subtitle, COLORS.muted, { spacing = 140 }))
     end
-    return line
+    return line, title
 end
 
 -- The tabs with dots between them, each with its count of changed rows; shrunk if they do not fit.
@@ -527,16 +524,18 @@ local function buildTabStrip(tree)
     return Widgets.ShrinkToFit(tree, "TabsFit", strip), tabWidgets
 end
 
-local function buildHeader(tree, column, controller)
+-- Returns the tabs' widgets and the title.
+local function buildHeader(tree, column)
     local header = Widgets.VerticalBox(tree, "Header")
-    header:AddChild(buildTitleLine(tree, controller))
+    local titleLine, title = buildTitleLine(tree)
+    header:AddChild(titleLine)
     local strip, tabWidgets = buildTabStrip(tree)
     local stripSlot = header:AddChild(strip)
     Widgets.Align(stripSlot, CENTER, nil)
     Widgets.Pad(stripSlot, 0, 14, 0, 0)
     Widgets.Pad(column:AddChild(header), SIDE_PADDING, 18, SIDE_PADDING, 14)
     column:AddChild((Widgets.Bar(tree, "HeaderLine", COLORS.edge, nil, 1)))
-    return tabWidgets
+    return tabWidgets, title
 end
 
 local function buildDescription(tree, column)
@@ -616,6 +615,21 @@ local function buildCorners(tree, frame)
     end
 end
 
+-- Did text in the theme's fonts get a size? A font file the engine could not read lays out as
+-- nothing (zero width): then the text would be invisible. Unmeasurable counts as fine.
+local function textRenders(textBlocks)
+    for _, textBlock in ipairs(textBlocks) do
+        local width = Unreal.TryNumber(function()
+            textBlock:ForceLayoutPrepass()
+            return textBlock:GetDesiredSize().X
+        end)
+        if width and width < 1 then return false end
+    end
+    return true
+end
+
+local themeFontsFailed = false   -- this session: the theme's fonts did not render, the engine's are used
+
 local function build(controller)
     Widgets.StartBuild()
     local widgetLibrary = Unreal.WidgetLibrary()
@@ -627,8 +641,8 @@ local function build(controller)
     root.WidgetTree = tree
     local canvas = Widgets.Construct("/Script/UMG.CanvasPanel", tree, "Canvas")
     tree.RootWidget = canvas
-    Widgets.ResolveFonts(App.settings.themeFonts and config.theme.fonts or nil)
-    Widgets.LoadImages(controller)
+    Widgets.ResolveFonts(App.settings.themeFonts and not themeFontsFailed and config.theme.fonts or nil)
+    Widgets.LoadImages(controller, { mark = config.theme.mark })
 
     local panel = Widgets.Border(tree, "Panel", COLORS.panel)
     local widthBox = Widgets.SizeBox(tree, "Width", nil, nil, WIDTH)
@@ -643,13 +657,19 @@ local function build(controller)
     try(function() frameSlot:SetAnchors({ Minimum = { X = 0.0, Y = 0.0 }, Maximum = { X = 0.0, Y = 0.0 } }) end)
     try(function() frameSlot:SetAutoSize(true) end)
 
-    local tabWidgets = buildHeader(tree, column, controller)
+    local tabWidgets, title = buildHeader(tree, column)
     local pages = {}
     for index, tab in ipairs(tabs) do pages[index] = buildPage(tree, column, index, tab) end
     local description = buildDescription(tree, column)
     local footer = buildFooter(tree, column)
 
     try(function() root:AddToViewport(1000) end)
+    if (Widgets.fonts.display or Widgets.fonts.body) and not textRenders({ title, tabWidgets[1] and tabWidgets[1].label }) then
+        Log.Info("menu fonts: the theme's fonts laid out empty (the engine could not read them); using the engine font")
+        themeFontsFailed = true
+        try(function() root:RemoveFromParent() end)
+        return build(controller)
+    end
     view.widgets = {
         root = root, frame = frame, frameSlot = frameSlot, tabs = tabWidgets, pages = pages,
         description = description, footer = footer,

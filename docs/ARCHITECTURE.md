@@ -22,8 +22,6 @@ Scripts/game/       games/<game>/     (without manifest.json)
 assets/             assets/           (the menu's mark, arrows, button disc, fonts; shared by every game)
 ```
 
-The installer also copies `assets/fonts/*.ttf` to `<contentPath>/Overhand/Fonts/*.ufont` in the game (see `core/ui/fonts.lua`).
-
 UE4SS loads `Scripts/main.lua`; everything else is a module loaded with `require`, resolved from `Scripts/` (`require("core.ui.menu")` is `Scripts/core/ui/menu.lua`). A game's own modules are always required as `game.*` (`require("game.features.health")`), so game code never knows its folder name in the repo. The smoke test assembles every game the same way.
 
 Each game also has a reference of its internals in `docs/games/<game>.md`.
@@ -75,7 +73,7 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 | `ui/input.lua` | Keyboard queue, controller polling (L3 + R3, D-pad, A, B, LB, RB), blocking the game's input while the menu is open. |
 | `ui/game_menus.lua` | Is one of the game's own menus open? (classes from the game, cached widgets) |
 | `ui/icon_finder.lua` | Writes the loaded images that look like controller button prompts to a file, to map the game's own icons. |
-| `ui/fonts.lua` | The theme's fonts at runtime: a FontFace per installed font file (streamed from the path its package name maps to) and a Font copied from the engine's Roboto with its typefaces pointed at them. Falls back to the engine font when a file is missing. |
+| `ui/fonts.lua` | The theme's fonts at runtime: a Font copied from the engine's Roboto whose typeface entries stream our `.ttf` files from `assets/fonts/` by file name (no FontFace assets: a cooked game does not read loose `.ufont` files). The menu falls back to the engine font when a file is missing or its text lays out empty. |
 
 ## src/gas/
 

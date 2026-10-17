@@ -94,7 +94,7 @@ end
 -- ---------------------------------------------------------------------------
 -- While the menu is open the character does not move, look around or act: his own input is
 -- disabled and the controller ignores move and look input.
---   Opened with the keyboard: UI-only input mode with the mouse cursor; game
+--   Opened with the keyboard: UI-only input mode (no mouse cursor: nothing in the menu is clicked); game
 --     menus do not open on Esc.
 --   Opened with the controller: game-and-UI input mode, because in UI-only mode the game stops
 --     processing controller buttons and the menu could not read them (tested in Valor Mortis). The
@@ -120,7 +120,6 @@ function Input.BlockGame(withController)
     if player then try(function() player:DisableInput(controller) end) end
     try(function() controller:SetIgnoreLookInput(true) end)
     try(function() controller:SetIgnoreMoveInput(true) end)
-    try(function() controller.bShowMouseCursor = not withController end)
     local widgetLibrary = Unreal.WidgetLibrary()
     local changed = withController and setGameAndUi(widgetLibrary, controller) or setUiOnly(widgetLibrary, controller)
     blocked = { player = player, controller = controller, changedInputMode = changed == true }

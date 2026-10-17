@@ -58,8 +58,6 @@ Scripts\game\       games\<game>\      (only that game)
 assets\             assets\            (the menu's mark, arrows, button disc, fonts)
 ```
 
-The menu's fonts also go into the game's Content folder (`<Game>\Content\Overhand\Fonts\*.ufont`): the engine reads a font file from there. `-Uninstall` removes them too.
-
 A game update or a Game Pass / Steam "repair" can remove UE4SS and the mod; install again afterwards. Your `settings.cfg` and teleports are kept across installs. The game's `manifest.json` lists other mods Overhand replaces (they are switched off, not deleted) and earlier folder names to take settings from.
 
 ## Files it writes

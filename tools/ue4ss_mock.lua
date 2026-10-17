@@ -8,12 +8,12 @@ local nextAddress = 1000
 -- Arrays with elements: a font's typeface entries (core/ui/fonts.lua fills them, Roboto has five).
 Mock.arrayLengths = { Fonts = 5 }
 
-local function newMock(className, invalid)
+local function newMock(className)
     nextAddress = nextAddress + 1
     local fields = { __className = className or "Mock", __address = nextAddress }
     local mock = {}
     local methods = {
-        IsValid = function() return not invalid end,
+        IsValid = function() return true end,
         GetAddress = function() return fields.__address end,
         GetFullName = function() return fields.__className .. " /Game/Mock." .. fields.__className end,
         GetClass = function()
@@ -30,7 +30,6 @@ local function newMock(className, invalid)
         K2_GetActorLocation = function() return { X = 100.0, Y = 200.0, Z = 300.0 } end,
         GetControlRotation = function() return { Pitch = 0.0, Yaw = 90.0, Roll = 0.0 } end,
         IsInputKeyDown = function(key) return Mock.keysDown[key.KeyName:ToString()] == true end,
-        GetProjectContentDirectory = function() return Mock.contentDirectory end,
     }
     setmetatable(mock, {
         __index = function(_, key)
@@ -51,8 +50,6 @@ Mock.controllerClass = config.controllerClass or "PlayerController"
 Mock.controller = newMock(Mock.controllerClass)
 Mock.controller.Pawn = newMock(config.playerClass or "Character")
 Mock.worldReady = false   -- false: main menu (no player controller found)
-Mock.ownPackages = "/Game/" .. (config.modName or "Mod") .. "/"
-Mock.contentDirectory = config.contentDirectory   -- the game's Content folder (engine's view)
 
 Mock.keyBinds = {}
 Mock.keysDown = {}   -- controller buttons held, by FKey name
@@ -65,11 +62,7 @@ function FindAllOf(className)
     end
     return nil
 end
--- Objects the mod creates itself (under /Game/<mod>/) do not exist before it does.
-function StaticFindObject(path)
-    if path:sub(1, #Mock.ownPackages) == Mock.ownPackages then return newMock("Missing", true) end
-    return newMock(path:match("([%w_]+)$") or "Static")
-end
+function StaticFindObject(path) return newMock(path:match("([%w_]+)$") or "Static") end
 function StaticConstructObject() return newMock("Constructed") end
 function CreateInvalidObject() return newMock("Invalid") end
 function LoadAsset() end

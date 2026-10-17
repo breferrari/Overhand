@@ -8,7 +8,7 @@
         Scripts\core\            src\core\
         Scripts\gas\             src\gas\            (only when the manifest says usesGas)
         Scripts\game\            games\<game>\       (without manifest.json)
-        assets\                 assets\             (the menu's mark)
+        assets\                 assets\             (the menu's mark, arrows, button disc, fonts)
         enabled.txt, LICENSE
     then copies it into <gameDir>\<modsPath>\<modName>\, keeping settings.cfg and teleports.txt.
 
@@ -68,12 +68,9 @@ $mods = Join-Path $GameDir $manifest.modsPath
 if (-not (Test-Path $mods)) { throw "UE4SS Mods folder not found: $mods (is UE4SS installed? is -GameDir right?)" }
 if (Get-Process -Name $manifest.processName -ErrorAction SilentlyContinue) { throw "$($manifest.gameName) is running. Close it first." }
 $target = Join-Path $mods $manifest.modName
-# The menu's fonts live in the game's Content folder (core/ui/fonts.lua): <contentPath>\<modName>\Fonts
-$contentTarget = if ($manifest.contentPath) { Join-Path (Join-Path $GameDir $manifest.contentPath) $manifest.modName }
 
 if ($Uninstall) {
     if (Test-Path $target) { Remove-Item $target -Recurse -Force; "Removed $target" }
-    if ($contentTarget -and (Test-Path $contentTarget)) { Remove-Item $contentTarget -Recurse -Force; "Removed $contentTarget" }
     foreach ($name in $manifest.replacesMods) {
         $disabled = Join-Path $mods "$name\enabled.txt.disabled"
         if (Test-Path $disabled) { Rename-Item $disabled "enabled.txt"; "$name switched back on" }
@@ -104,18 +101,6 @@ if (Test-Path $target) {
 New-Item -ItemType Directory $target -Force | Out-Null
 Copy-Item (Join-Path $build "*") $target -Recurse -Force
 "Installed to $target"
-
-# Fonts: a cooked .ufont is the plain font file, read from where the font's package name points.
-# (tools/smoke_test.py lays the fonts out the same way.)
-if ($contentTarget) {
-    $fonts = Join-Path $contentTarget "Fonts"
-    if (Test-Path $fonts) { Remove-Item $fonts -Recurse -Force }
-    New-Item -ItemType Directory $fonts -Force | Out-Null
-    foreach ($font in Get-ChildItem (Join-Path $repo "assets\fonts") -Filter "*.ttf") {
-        Copy-Item $font.FullName (Join-Path $fonts ($font.BaseName + ".ufont"))
-    }
-    "Fonts installed to $fonts"
-}
 
 foreach ($name in $manifest.replacesMods) {
     $enabled = Join-Path $mods "$name\enabled.txt"

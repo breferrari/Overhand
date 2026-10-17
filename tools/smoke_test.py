@@ -34,9 +34,8 @@ def load_manifest(game: str) -> dict:
 
 
 def assemble(game: str, manifest: dict, into: pathlib.Path) -> pathlib.Path:
-    """The installed mod folder, as tools/install.ps1 builds it, inside a game folder laid out like
-    the real one (so the mod finds its fonts in the game's Content folder)."""
-    mod = into / pathlib.PureWindowsPath(manifest["modsPath"]).as_posix() / manifest["modName"]
+    """The installed mod folder, as tools/install.ps1 builds it."""
+    mod = into / manifest["modName"]
     scripts = mod / "Scripts"
     scripts.mkdir(parents=True)
     shutil.copy(SOURCE / "main.lua", scripts)
@@ -45,12 +44,6 @@ def assemble(game: str, manifest: dict, into: pathlib.Path) -> pathlib.Path:
         shutil.copytree(SOURCE / "gas", scripts / "gas")
     shutil.copytree(GAMES / game, scripts / "game", ignore=shutil.ignore_patterns("manifest.json"))
     shutil.copytree(REPO / "assets", mod / "assets")
-    if manifest.get("contentPath"):
-        # as tools/install.ps1 does: assets/fonts/*.ttf -> <contentPath>/<modName>/Fonts/*.ufont
-        fonts = into / pathlib.PureWindowsPath(manifest["contentPath"]).as_posix() / manifest["modName"] / "Fonts"
-        fonts.mkdir(parents=True)
-        for font in (REPO / "assets" / "fonts").glob("*.ttf"):
-            shutil.copy(font, fonts / (font.stem + ".ufont"))
     return mod
 
 
@@ -83,13 +76,9 @@ def run_mod(mod: pathlib.Path, manifest: dict, walk_menu: bool = True) -> list[s
     lua = lua54.LuaRuntime()
     scripts = (mod / "Scripts").as_posix()
     lua.execute(f'package.path = "{scripts}/?.lua;" .. package.path')
-    game_folder = mod.parents[len(pathlib.PureWindowsPath(manifest["modsPath"]).parts)]
-    content = game_folder / pathlib.PureWindowsPath(manifest.get("contentPath", "Content")).as_posix()
     lua.globals().MockConfig = lua.table_from({
         "controllerClass": expectations.get("controllerClass", "PlayerController"),
         "playerClass": expectations.get("playerClass", "Character"),
-        "modName": manifest["modName"],
-        "contentDirectory": content.as_posix() + "/",
     })
     mock = lua.execute(f'return dofile("{MOCK.as_posix()}")')
     lua.execute(f'dofile("{scripts}/main.lua")')

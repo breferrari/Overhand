@@ -3,7 +3,6 @@
     "modName": "Overhand",
     "defaultGameDir": "C:\\XboxGames\\Valor Mortis\\Content",
     "modsPath": "ValorMortis\\Binaries\\Win64\\ue4ss\\Mods",
-    "contentPath": "ValorMortis\\Content",
     "processName": "ValorMortis*",
     "usesGas": true,
     "replacesMods": ["ValorCheatMenu", "PassiveHealthRegen"],

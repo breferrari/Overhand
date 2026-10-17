@@ -13,10 +13,11 @@ local App = {
     status = "",          -- one line of feedback for the menu's status row
 }
 
--- A setting with its default. options.notACheat: Turn Everything Off leaves it alone.
+-- A setting with its default (a default the game already gave it wins). options.notACheat: Turn
+-- Everything Off leaves it alone.
 function App.AddSetting(key, default, options)
-    if App.settings[key] == nil then App.settings[key] = default end
-    App.defaults[key] = default
+    if App.defaults[key] == nil then App.defaults[key] = default end
+    if App.settings[key] == nil then App.settings[key] = App.defaults[key] end
     if options and options.notACheat then App.notACheat[key] = true end
 end
 
