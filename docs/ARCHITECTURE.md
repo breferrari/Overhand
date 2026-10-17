@@ -1,24 +1,49 @@
 # Architecture
 
-ValorianSheet is a UE4SS Lua mod. UE4SS loads `Scripts/main.lua`; everything else is a module loaded with `require`, resolved from `Scripts/` (`require("core.ui.menu")` is `Scripts/core/ui/menu.lua`).
-
-The code is in three layers, and dependencies only point down:
+Overhand is a UE4SS Lua mod framework with one folder per supported game. The repo holds:
 
 ```
-game/   Valor Mortis: app definition, game access, features, menu content
-        │
-        ▼
-gas/                 Gameplay Ability System helpers (any GAS game)
-        │
-        ▼
-core/                Unreal + UE4SS + the menu framework (any UE4SS game)
+src/main.lua        entry point
+src/core/           Unreal + UE4SS + the menu framework (any UE4SS game)
+src/gas/            Gameplay Ability System helpers (any GAS game)
+games/<game>/       one game: app definition, game access, features, menu content, manifest.json
+tools/              install.ps1 (build + install one game), smoke_test.py, ue4ss_mock.lua
 ```
 
-`core/` never requires `gas/` or `game/`, and `gas/` never requires `game/`. The smoke test enforces this. Whatever core needs from a game (the player, the controller, the game's menu widgets, button icons) is passed in by the game at startup. That is what makes the menu portable: a new game is a copy of this repo with a new `game/` (see [PORTING.md](PORTING.md)).
+## How a game's mod is assembled
+
+`tools/install.ps1 -Game <game>` builds `build/<game>/Overhand/` from only what that game needs, and installs it into the game's `ue4ss/Mods/`:
+
+```
+Scripts/main.lua    src/main.lua
+Scripts/core/       src/core/
+Scripts/gas/        src/gas/          (only when manifest.json says usesGas)
+Scripts/game/       games/<game>/     (without manifest.json)
+```
+
+UE4SS loads `Scripts/main.lua`; everything else is a module loaded with `require`, resolved from `Scripts/` (`require("core.ui.menu")` is `Scripts/core/ui/menu.lua`). A game's own modules are always required as `game.*` (`require("game.features.health")`), so game code never knows its folder name in the repo. The smoke test assembles every game the same way.
+
+`manifest.json` holds what the installer and the smoke test need: the game's install path and UE4SS Mods path, its process name, whether it uses GAS, mods Overhand replaces (switched off on install), earlier folder names of this mod (settings migrated, folder removed), and the smoke test's expectations.
+
+## Layers
+
+Dependencies only point down:
+
+```
+games/<game>/   (installed as game/)
+        │
+        ▼
+src/gas/
+        │
+        ▼
+src/core/
+```
+
+`core/` never requires `gas/` or `game/`, and `gas/` never requires `game/`. The smoke test enforces this. Whatever core needs from a game (the player, the controller, the game's menu widgets, button icons) is passed in by the game at startup. A new game is a new folder under `games/` (see [PORTING.md](PORTING.md)).
 
 ## Startup
 
-`main.lua` requires `game/init.lua`, which:
+`main.lua` requires `game.init` (the installed game's `init.lua`), which:
 
 1. defines the app (`App.Define`: name, version, menu title, every setting with its vanilla value),
 2. passes core what it needs (`Gas.Configure`, `Menu.Configure`, `Runner.Configure`),
@@ -27,7 +52,7 @@ core/                Unreal + UE4SS + the menu framework (any UE4SS game)
 
 Then `main.lua` starts the log, loads the settings, binds the keys and starts one game-thread loop (every 33 ms): `Menu.Tick`, `Runner.Tick`, `Settings.SaveIfDirty`.
 
-## core/
+## src/core/
 
 | Module | Responsibility |
 |---|---|
@@ -46,14 +71,15 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 | `ui/game_menus.lua` | Is one of the game's own menus open? (classes from the game, cached widgets) |
 | `ui/icon_finder.lua` | Writes the loaded images that look like controller button prompts to a file, to map the game's own icons. |
 
-## gas/
+## src/gas/
 
 `gas.lua`: attribute reads and writes (`GetAttribute`, `SetBaseValueKeepModifiers`, `FillAttribute`, ...), the override accessors `BASE_VALUE` (saved, ledgered) and `CURRENT_VALUE` (live only), gameplay tags, applying effects, and a per-tick snapshot of the player's active effects. Needs only the player's AbilitySystemComponent, passed in with `Gas.Configure`.
 
-## game/
+## games/valormortis/
 
 | Module | Responsibility |
 |---|---|
+| `manifest.json` | Install and test settings (see How a game's mod is assembled). Not installed. |
 | `init.lua` | Wires everything above (see Startup). |
 | `app.lua` | Name, version, menu title, every setting with its vanilla value. |
 | `game.lua` | Valor Mortis access: controller and player classes, components, attribute sets, subsystems, items, the developers' cheat manager. |
@@ -81,12 +107,12 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 5. **The menu only writes settings.** Features read `App.settings` and apply it in their tick. Actions (buttons) are plain functions; the menu checks that a save is loaded before running one (unless it is marked `anytime`) and asks twice when it has a `confirm` prompt.
 6. **One world reset.** Objects found through `core/unreal.lua` are per world and dropped automatically; other per-world state is dropped in a callback registered with `Unreal.OnWorldReset`.
 7. **One way to save.** Whatever changes persisted state calls `Settings.MarkDirty()`; the main loop writes the files.
-8. **Layers point down.** `core/` knows no game and no GAS; `gas/` knows no game. A game passes core what it needs.
+8. **Layers point down.** `core/` knows no game and no GAS; `gas/` knows no game. A game passes core what it needs, and requires its own modules as `game.*`.
 9. **Names say what things are.** Full names for modules (`Game`, `App`, `Health`) and locals (`player`, `healthSet`, `factor`).
 
 ## Adding a cheat
 
-1. Add the setting with its vanilla value in `game/app.lua`.
+1. Add the setting with its vanilla value in `games/<game>/app.lua`.
 2. Implement it in the matching `features/` module: apply it in a tick function; register anything per-world that is not a cached lookup with `Unreal.OnWorldReset`. A new module is registered in `init.lua` with `Runner.AddFeature`.
 3. Add a row in `sheet.lua` (`Menu.Toggle`, `Menu.Choice` or `Menu.Action`).
-4. Run `python tools/smoke_test.py`, then try it in the game.
+4. Run `python tools/smoke_test.py <game>`, install with `tools/install.ps1 -Game <game>` and try it in the game.

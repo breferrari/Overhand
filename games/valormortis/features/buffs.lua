@@ -1,4 +1,4 @@
--- game/features/buffs.lua
+-- games/valormortis/features/buffs.lua
 -- Infinite Buffs: potions, weapon coatings and pistol boosts never run out.
 -- Every active buff gets a very long duration; the old one comes back when the cheat is switched
 -- off. Buffs are saved with their remaining time, so after a load with the cheat off, buffs that

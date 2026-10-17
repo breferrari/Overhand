@@ -1,4 +1,4 @@
--- game/features/resources.lua
+-- games/valormortis/features/resources.lua
 -- Infinite Ammo, Healing Flasks and Consumables, No Item Cooldowns, Keep Catalysts On Death and
 -- Refill Everything.
 

@@ -1,4 +1,4 @@
--- game/features/hud.lua
+-- games/valormortis/features/hud.lua
 -- The player's HUD: telling it about values written directly (health, ammo, buff counters), and
 -- keeping the health bar at its normal length while Max Health is raised.
 --

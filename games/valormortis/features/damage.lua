@@ -1,4 +1,4 @@
--- game/features/damage.lua
+-- games/valormortis/features/damage.lua
 -- Scaling damage before it lands. The game deals damage through MTCombatUtils functions; we hook
 -- them and scale the damage values:
 --   incoming (target is William): God Mode blocks it (Damage Taken works on resistances instead,

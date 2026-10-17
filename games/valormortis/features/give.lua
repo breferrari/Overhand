@@ -1,4 +1,4 @@
--- game/features/give.lua
+-- games/valormortis/features/give.lua
 -- One-shot gifts: catalysts, upgrade materials, consumables, a chosen item, weapons, abilities, gems.
 
 local Unreal = require("core.unreal")

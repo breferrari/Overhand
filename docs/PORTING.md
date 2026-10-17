@@ -1,29 +1,28 @@
-# Bringing the menu to another game
+# Adding a game
 
-`core/` (menu, input, settings, logging, lookups, overrides, the per-tick loop) and `gas/` know no game; everything game-specific is in `game/`. A new game is **a copy of this repo with a new `game/`**: keep `core/`, `gas/` and `tools/`, replace `game/`. This guide uses **Atomic Heart** as the example.
+Overhand keeps every game in one repo: `src/core/` (menu, input, settings, logging, lookups, overrides, the per-tick loop) and `src/gas/` know no game, and each game is a folder under `games/`. Adding a game is **a new `games/<name>/` folder with a `manifest.json`**; the installer builds that game's mod from `src/` plus that folder only, so no other game's code is installed with it. This guide uses **Atomic Heart** as the example.
 
-## What carries over, what doesn't
+## What a new game reuses
 
 | Part | New game |
 |---|---|
-| `core/` | As is. |
-| `gas/` | As is, **if** the game uses Unreal's Gameplay Ability System. Many UE games do; Atomic Heart is not known to (its stats are likely on its own components). Without GAS, leave `gas/` unused. |
-| `tools/smoke_test.py`, `tools/ue4ss_mock.lua` | As is; the mock's player class names change (see Test). |
-| `tools/install.ps1` | New game path and folder name. |
-| `game/` | Replaced: it is Valor Mortis' class names, attributes and cheats. Keep the copy's old `game/` around as the pattern while writing the new one. |
+| `src/core/` | As is. |
+| `src/gas/` | As is, **if** the game uses Unreal's Gameplay Ability System (`"usesGas": true` in the manifest). Many UE games do; Atomic Heart is not known to (its stats are likely on its own components). Without GAS it is not installed. |
+| `tools/` | As is: `install.ps1 -Game <name>`, `smoke_test.py` (tests every game), the UE4SS mock. |
+| `games/valormortis/` | The pattern to follow; none of it is installed for another game. |
 
-The real work for a new game is **finding its internals**: which class is the player and his controller, where health and stamina live, which functions deal damage, which widgets are its menus. The framework saves everything else.
+The real work for a new game is **finding its internals**: which class is the player and his controller, where health and stamina live, which functions deal damage, which widgets are its menus. The framework covers everything else.
 
 ## Requirements
 
-- **UE4SS** that supports the game's engine version. Atomic Heart is Unreal Engine 4; UE4SS's stable release covers UE4 (UE 5.6+ games like Valor Mortis need the experimental build).
-- The game must allow mods to load (`dwmapi.dll` / `xinput1_3.dll` proxy). Some games with anti-cheat block this; single-player games usually don't.
+- **UE4SS** that supports the game's engine version. Atomic Heart is Unreal Engine 4; UE4SS's stable release covers UE 4.12 through 5.5 (UE 5.6+ games like Valor Mortis need the experimental build). Some games need a custom config from UE4SS's `zCustomGameConfigs`.
+- The game must allow mods to load (UE4SS's DLL proxy). Single-player games usually do; online games with anti-cheat usually don't.
 
 ## Steps
 
 ### 1. Find the internals
 
-Turn on UE4SS's console and object dumper (`UE4SS-settings.ini`: `ConsoleEnabled = 1`, then the "Dump objects" key, or the Live View in the GUI console). Look for:
+Turn on UE4SS's console and tools (`UE4SS-settings.ini`: `ConsoleEnabled = 1`, `GuiConsoleEnabled = 1`) and use the Live View or the object dumper. Look for:
 
 | What | Valor Mortis | Atomic Heart (to find) |
 |---|---|---|
@@ -34,30 +33,53 @@ Turn on UE4SS's console and object dumper (`UE4SS-settings.ini`: `ConsoleEnabled
 | Game menus | `WBP_PauseMenu_C`, ... | the pause / inventory widget classes |
 | Developer cheats | `BP_MTCheatManager` | `CheatManager` subclass, if any |
 
-### 2. Copy the repo and write a new `game/`
-
-Copy the repository (e.g. `C:\Dev\HeartSheet`), rename the mod folder (`mod/HeartSheet/`), and replace the contents of `Scripts/game/`:
+### 2. Create `games/atomicheart/`
 
 ```
-game/
-  init.lua      wiring (start from the old init.lua and trim)
-  app.lua       App.Define: name, version, menu title, settings with vanilla values
-  game.lua      Controller(), Player(), and whatever access the cheats need
-  sheet.lua     the menu tabs
-  features/     one module per feature group
+games/atomicheart/
+  manifest.json   where the game is, GAS or not, test expectations (not installed)
+  init.lua        wiring (start from valormortis/init.lua and trim)
+  app.lua         App.Define: version, menu title, settings with vanilla values
+  game.lua        Controller(), Player(), and whatever access the cheats need
+  sheet.lua       the menu tabs
+  features/       one module per feature group
 ```
 
-**`app.lua`**: the mod's name decides its file names (`<name>.log`, `<name>-BugReport.txt`); `settings.cfg` and the menu keys are shared.
+Inside the game folder, require its own modules as `game.*` (it is installed as `Scripts/game/`), and the shared ones as `core.*` / `gas.*`.
+
+**`manifest.json`**
+
+```json
+{
+    "gameName": "Atomic Heart",
+    "modName": "Overhand",
+    "defaultGameDir": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Atomic Heart",
+    "modsPath": "AtomicHeart\\Binaries\\Win64\\ue4ss\\Mods",
+    "processName": "AtomicHeart*",
+    "usesGas": false,
+    "replacesMods": [],
+    "previousModFolders": [],
+    "smokeTest": {
+        "controllerClass": "<PlayerControllerClass>",
+        "playerClass": "<PlayerCharacterClass>",
+        "tabCount": 3,
+        "expectLog": [],
+        "expectDefaults": ["godMode=false"],
+        "expectAbsentDefaults": []
+    }
+}
+```
+
+**`app.lua`**
 
 ```lua
 local App = require("core.app")
 App.Define({
-    name = "HeartSheet",
+    name = "Overhand",
     version = "0.1.0",
-    menuTitle = "HEART SHEET",
+    menuTitle = "OVERHAND",
     status = "Waiting for a loaded save...",
     settings = { godMode = false, infiniteAmmo = false, movementSpeed = 1 },
-    sessionOnly = {},
 })
 return App
 ```
@@ -76,7 +98,7 @@ end
 return Game
 ```
 
-**`init.lua`**: the part that connects the game to core.
+**`init.lua`**: connects the game to core.
 
 ```lua
 require("game.app")
@@ -102,15 +124,14 @@ For a GAS game also add `Gas.Configure({ abilitySystem = Game.AbilitySystem })` 
 
 **Features**: the same shape as Valor Mortis'. A tick function that reads `App.settings` and applies it, `Override` for values the game also writes (`Override:property(movement, "MaxWalkSpeed", factor)`), `Unreal.OnWorldReset` for per-world state.
 
-### 3. Install
+### 3. Test and install
 
-`main.lua` needs no change (it loads `game/init.lua`). Adapt `tools/install.ps1` (game path, mod folder name) and install into the game's `ue4ss\Mods\`.
+```powershell
+python tools\smoke_test.py atomicheart
+.\tools\install.ps1 -Game atomicheart
+```
 
-### 4. Test
-
-- `python tools/smoke_test.py`: set the mock's controller and pawn class names in `tools/ue4ss_mock.lua` to the new game's. The layer check keeps `core/` and `gas/` game-free.
-- In the game: F5 or L3 + R3; check the log (`<name>.log`) for "player found" and the features' lines.
-- Controller prompts: Misc → **Find controller button icons** writes the game's loaded button images to `<name>-ButtonIcons.txt`; put the paths into `buttonIcons` (`A`, `B`, `LB`, `RB`, `D-pad`).
+In the game: F5 or L3 + R3; check `Overhand.log` for "player found" and the features' lines. For controller prompts, Misc → **Find controller button icons** writes the game's loaded button images to `Overhand-ButtonIcons.txt`; put the paths into `buttonIcons` (`A`, `B`, `LB`, `RB`, `D-pad`).
 
 ## Things that may differ per game
 

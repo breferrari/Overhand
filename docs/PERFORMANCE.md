@@ -19,7 +19,7 @@ Per-tick or timer paths in the original that ran full object searches, found by 
 | Player controller lookup | **every tick (30/s)** whenever no player controller existed: main menu, loading screens | 30/s |
 | Attribute set / inventory / save subsystem lookups | every tick while not found yet | up to 30/s each |
 
-## How ValorianSheet finds objects
+## How Overhand finds objects
 
 All searches go through `core/unreal.lua`, the one place allowed to call `FindAllOf`:
 
@@ -61,4 +61,4 @@ Everything kept is per world and dropped by the single world reset when a new Wi
 
 ## Checking it yourself
 
-Compare frame times in the same spot with the mod on and off (rename `Mods\ValorianSheet\enabled.txt`). Turn on **Debug logging** (Misc tab) to see what each cheat does in `ValorianSheet.log`.
+Compare frame times in the same spot with the mod on and off (rename `Mods\Overhand\enabled.txt`). Turn on **Debug logging** (Misc tab) to see what each cheat does in `Overhand.log`.

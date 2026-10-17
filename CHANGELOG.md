@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0 (2026-10-17): Overhand
+
+- **Renamed to Overhand** (was ValorianSheet). The installed folder is `Mods\Overhand\`; the install script takes `settings.cfg` and `teleports.txt` from `Mods\ValorianSheet\` and removes that folder. Logs and reports are `Overhand.log`, `Overhand-BugReport.txt`, `Overhand-ButtonIcons.txt`.
+- **One repo, many games:** `src/` (main, core, gas) is shared and each game is a folder under `games/` with a `manifest.json`. `tools/install.ps1 -Game <game>` assembles `build/<game>/Overhand/` from `src/` and that game only (gas only for GAS games) and installs it; game code requires itself as `game.*`.
+- **Smoke test** runs per game, assembled like the installer, with the game's expectations from its manifest; it now lets the features tick while the menu is walked (before, the walk happened inside the world's settle time, so features were never exercised).
+
 ## 1.3.0 (2026-10-17)
 
 - **Layers for other games:** the code is split into `core/` (menu, input, settings, logging, lookups, overrides, the per-tick runner; knows no game), `gas/` (Gameplay Ability System helpers) and `game/` (Valor Mortis). Another game is a copy of the repo with its own `game/`. The game passes core what it needs (`Menu.Configure`, `Runner.Configure`, `Gas.Configure`) and register their features, settings stores and bug report sections. The smoke test enforces that core and gas stay game-free. Guide: [docs/PORTING.md](docs/PORTING.md).

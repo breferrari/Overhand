@@ -1,4 +1,4 @@
--- game/sheet.lua
+-- games/valormortis/sheet.lua
 -- What the menu shows: six tabs, each row bound to a setting or an action of a feature module.
 -- Actions need a loaded save unless marked { anytime = true }.
 

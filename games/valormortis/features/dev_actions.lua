@@ -1,4 +1,4 @@
--- game/features/dev_actions.lua
+-- games/valormortis/features/dev_actions.lua
 -- What still works of the developers' cheat manager: its Blueprint cheat actions (gems, ability
 -- unlocks) and the engine's ability-cost toggle (No Ability Costs).
 

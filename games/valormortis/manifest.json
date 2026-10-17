@@ -1,0 +1,18 @@
+{
+    "gameName": "Valor Mortis",
+    "modName": "Overhand",
+    "defaultGameDir": "C:\\XboxGames\\Valor Mortis\\Content",
+    "modsPath": "ValorMortis\\Binaries\\Win64\\ue4ss\\Mods",
+    "processName": "ValorMortis*",
+    "usesGas": true,
+    "replacesMods": ["ValorCheatMenu", "PassiveHealthRegen"],
+    "previousModFolders": ["ValorianSheet"],
+    "smokeTest": {
+        "controllerClass": "BP_PlayerController_C",
+        "playerClass": "BP_PlayerCharacter_C",
+        "tabCount": 6,
+        "expectLog": ["button icons:", "damage taken:"],
+        "expectDefaults": ["godMode=false", "regenPerSecond=0", "debugLogging=false"],
+        "expectAbsentDefaults": ["noClip="]
+    }
+}

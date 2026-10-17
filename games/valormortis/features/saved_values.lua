@@ -1,4 +1,4 @@
--- game/features/saved_values.lua
+-- games/valormortis/features/saved_values.lua
 -- Checked once after every load: attribute values the game saved while a cheat was on.
 
 local Unreal = require("core.unreal")

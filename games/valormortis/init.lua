@@ -1,4 +1,4 @@
--- game/init.lua
+-- games/valormortis/init.lua
 -- Wires Valor Mortis into core: defines the app, registers the features and once-per-world checks
 -- with the runner, configures GAS and the menu, and adds the game's part of the bug report.
 -- main.lua requires this once; nothing in core knows about Valor Mortis.

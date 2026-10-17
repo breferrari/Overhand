@@ -38,9 +38,12 @@ local function newMock(className)
     return mock
 end
 
--- The world the mod sees: a controller whose pawn is William.
-Mock.controller = newMock("BP_PlayerController_C")
-Mock.controller.Pawn = newMock("BP_PlayerCharacter_C")
+-- The world the mod sees: a controller whose pawn is the player. The class names come from the
+-- game's manifest (smokeTest), set as MockConfig before this file runs.
+local config = rawget(_G, "MockConfig") or {}
+Mock.controllerClass = config.controllerClass or "PlayerController"
+Mock.controller = newMock(Mock.controllerClass)
+Mock.controller.Pawn = newMock(config.playerClass or "Character")
 Mock.worldReady = false   -- false: main menu (no player controller found)
 
 Mock.keyBinds = {}
@@ -49,7 +52,7 @@ Mock.loop = nil
 Mock.printed = {}
 
 function FindAllOf(className)
-    if className == "BP_PlayerController_C" then
+    if className == Mock.controllerClass then
         return Mock.worldReady and { Mock.controller } or nil
     end
     return nil

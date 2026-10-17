@@ -1,12 +1,12 @@
--- game/app.lua
--- ValorianSheet for Valor Mortis: the mod's identity and every setting with its vanilla value.
+-- games/valormortis/app.lua
+-- Overhand for Valor Mortis: the mod's identity and every setting with its vanilla value.
 
 local App = require("core.app")
 
 App.Define({
-    name = "ValorianSheet",
-    version = "1.3.0",
-    menuTitle = "VALORIAN SHEET",
+    name = "Overhand",
+    version = "1.4.0",
+    menuTitle = "OVERHAND",
     status = "Waiting for a loaded save...",
     settings = {
         godMode = false,

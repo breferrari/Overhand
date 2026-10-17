@@ -1,4 +1,4 @@
--- game/shared.lua
+-- games/valormortis/shared.lua
 -- Runtime flags read by more than one Valor Mortis feature.
 
 local Shared = {

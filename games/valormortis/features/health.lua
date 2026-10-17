@@ -1,4 +1,4 @@
--- game/features/health.lua
+-- games/valormortis/features/health.lua
 -- Survival: God Mode, Infinite Stamina / Nephtoglobin, Fall Damage, Max Health and Health
 -- Regeneration. (Damage Taken is features/defense.lua.)
 
