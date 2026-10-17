@@ -376,6 +376,11 @@ function Widgets.ButtonChip(tree, name, label)
     return box
 end
 
+-- Opacity 0..1: a paint change only (no new layout), unlike visibility.
+function Widgets.SetOpacity(widget, opacity)
+    try(function() widget:SetRenderOpacity(opacity) end)
+end
+
 function Widgets.SetVisible(widget, visible)
     try(function() widget:SetVisibility(visible and SHOWN or COLLAPSED) end)
 end
