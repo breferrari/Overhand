@@ -23,6 +23,8 @@ Scripts/game/       games/<game>/     (without manifest.json)
 
 UE4SS loads `Scripts/main.lua`; everything else is a module loaded with `require`, resolved from `Scripts/` (`require("core.ui.menu")` is `Scripts/core/ui/menu.lua`). A game's own modules are always required as `game.*` (`require("game.features.health")`), so game code never knows its folder name in the repo. The smoke test assembles every game the same way.
 
+Each game also has a reference of its internals in `docs/games/<game>.md`.
+
 `manifest.json` holds what the installer and the smoke test need: the game's install path and UE4SS Mods path, its process name, whether it uses GAS, mods Overhand replaces (switched off on install), earlier folder names of this mod (settings migrated, folder removed), and the smoke test's expectations.
 
 ## Layers

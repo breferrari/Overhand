@@ -1,0 +1,109 @@
+# Valor Mortis internals
+
+What we know about Valor Mortis' internals, and how Overhand uses each part. Marked **confirmed in game** where an in-game test or log showed it working (as of 2026-10-17); the rest comes from reading the game through code that runs (it may still need a check after a game update).
+
+The game's code module is **MinotaurCore** (`/Script/MinotaurCore.*`); its assets live under `/Game/Minotaur/`.
+
+## Setup
+
+| | |
+|---|---|
+| Engine | Unreal Engine 5.7 |
+| UE4SS | experimental-latest required (stable 3.0.1 predates UE 5.6/5.7). Tested: `UE4SS_v3.0.1-1176-g1ba38db4` |
+| Crash Fix | `bForceGUObjectArrayForIteration = true` (community recommendation) |
+| Game Pass path | `C:\XboxGames\Valor Mortis\Content\ValorMortis\Binaries\Win64\` (`Win64`, not `WinGDK`); exe `ValorMortisMSG-Win64-Shipping.exe` |
+| UE4SS proxy | `dwmapi.dll` works on the Game Pass build (**confirmed in game**) |
+
+## Player
+
+| What | Where |
+|---|---|
+| Controller | `BP_PlayerController_C` (its `Pawn`, `CheatManager`) |
+| Character | `BP_PlayerCharacter_C`. A loading-screen character exists before it; check the class. |
+| Components | `CharacterMovement`, `AttributesNotifierComponent`, `AbilitySystemComponent` (properties on the character) |
+| World | `player:GetOuter():GetOuter()`; map name from the world's FName |
+| Movement modes | `CharacterMovement.MovementMode`: 3 falling, 5 flying |
+
+## Attributes (GAS)
+
+Valor Mortis uses the Gameplay Ability System. `BaseValue` is saved with the game; `CurrentValue` is base plus modifiers.
+
+| Set (property on `AttributesNotifierComponent`) | Attributes we use |
+|---|---|
+| `HealthAttributes` | `Health`, `MaxHealth`, `MeleeResistance`, `RangedResistance`, `ExplosiveResistance`, `MagicResistance` (all four readable, **confirmed in game**), `DamageMultiplier` (does not change damage taken, per the Cheat Menu's tests) |
+| `StaminaAttributes` | `Stamina`, `MaxStamina` |
+| `BloodAttributes` | `BloodPoints`, `MaxBloodPoints` (Nephtoglobin) |
+| `FlasksAttributes` | `HealingFlasks`, `HealingFlasksMax` |
+| `RangedAttributes` | `PistolAmmo` / `BlunderbussAmmo` / `RifleAmmo`, `...AmmoInClip`, `Max...`, `RangedDamageMultiplier` |
+| `ExpAttributes` | `ExpPoints` |
+
+| Set found by class (owned by the character) | |
+|---|---|
+| `MeleeAttributeSet` | `MeleeDamageMultiplier`, `ParryWindowAdjustment` (what the "Forgiving Parry" gem raises) |
+| `MovementAttributeSet` | (not used) |
+
+- **Resistances:** a resistance `r` lets `1 - r` of the damage through. Raising `CurrentValue` reduces damage (Damage Taken, **confirmed in game**: 50 % halves hits).
+- **GASCompanion:** `/Script/GASCompanion.Default__GSCBlueprintFunctionLibrary:GetCompanionCoreComponent(player)` returns a core whose `SetAttributeValue(attribute, value)` changes an attribute the normal way, and the HUD follows. The Health `FGameplayAttribute` comes from `GE_AddHealth`'s modifiers (`/Game/Minotaur/Gameplay/GAS/GameplayEffects/GE_AddHealth.Default__GE_AddHealth_C`). Used by Health Regeneration (**confirmed in game**: "healing through the game").
+
+## Damage and combat (`/Script/MinotaurCore.MTCombatUtils`)
+
+| Function | Parameters after the context object | Used for |
+|---|---|---|
+| `DealMeleeDamage`, `DealRangedDamage`, `DealExplosiveDamage`, `DealEnvironmentalDamage`, `DealCriticalDamage` | 1 damage, 2 target, 4 attacker | God Mode (incoming × 0), One-Hit Kills / Damage Multiplier (outgoing) |
+| `DealIgniteDamage`, `DealInfectionDamage`, `DealCrystallizationDamage` | 1 damage, 2 target, 3 attacker | same |
+| `DealDamage` | 2 damage, 3 target, 4 attacker | same |
+| `DealDamageWithEffect` | 3 damage, 4 target, 5 attacker | same |
+| `DealCombinedDamage` | damage 2, 3, 4, 5, 7, 8, 10; 12 target, 13 attacker | same |
+| `CheckBlockMelee`, `CheckBlockMeleeForProperties`, `CheckBlockProjectile` | attack data (`PerfectParryOpeningTime`), blocker | Parry Window |
+| `Overheal(amount, player)` | | God Mode, Refill (heals through a GameplayEffect) |
+| `AddExperiencePointsToPlayer(amount)` | | +Catalysts |
+
+- Projectiles and grenades carry the player as their `Instigator`.
+- Fall damage is not dealt through these functions: it comes from the character's `FallDamageCurve` (height → damage, a float curve asset). `SetLastApexHeightToCurrentPosition()` while falling cancels it.
+- Enemies: `EnemyCharacter` with `HealthAttributes`; `KillCharacter(killer, tagContainer)`.
+- In combat: the world's `EnemyInfoSubsystem.EnemiesInCombatState` (match the subsystem's outer to the player's world). `CombatSubsystem:IsInCombat()` also exists.
+- Dodge: each dodge applies `GE_Invincibility_C` (0.25 s), alongside `GE_DodgeAttackEnabled_C` / `GE_Dodge_WaitingForInput_C` / `GE_DodgeCooldown_C`. The game re-checks `Spec.Duration` when an effect expires, so a longer duration keeps it.
+- Weapon parry fields: `CurrentMeleeWeapon.PerfectParryCooldown`, `PerfectParrySpamReduction`.
+
+## Effects
+
+- Active effects: `AbilitySystemComponent.ActiveGameplayEffects.GameplayEffects_Internal` (`Spec.Def`, `Spec.Duration`, `Spec.StackCount`, `StartWorldTime`).
+- Buffs: `GE_Bubble_C`, `GE_ProtectionPotion_C`, `GE_StaminaPotion_C`, `GE_Rage_C`, coatings `GE_FlamingCoating_C` / `GE_SharpCoating_C` / `GE_StasisCoating_C`, pistol boosts `GE_FlamingBoost_C` / `GE_PreciseBoost_C` / `GE_StasisBoost_C` / `GE_ConcussingBoost_C`. Coatings and boosts count hits as stacks.
+- Restore (like resting at a lantern): `GE_FullHeal_C`, `GE_FullStamina_C`, `GE_HealingFlasksRestore_C`, `GE_RestoreNephtoglobinAtLantern_C` under `/Game/Minotaur/Gameplay/GAS/GameplayEffects/`.
+- `PlayerAttributesNotifier:OnGameplayEffectStackChanged(handle, new, old)`: hooked to learn effect handles; also tells the HUD about stack changes.
+
+## Items and inventory
+
+- `InventorySubsystem.InventoryDatabaseAsset`: maps `ConsumableItemsMap`, `MaterialItemsMap`, `InstantItemsMap`, `NarrativeItemsMap` (story items; left out of Give Item). Each maps a category tag to an `ItemMap` of real items. 34 consumables, 14 materials, 7 instant items (**confirmed in game**). In-game names in `UIData.TextStats`.
+- `SaveSubsystem:TryGetInventoryItemCount(tag)`, `InventorySubsystem:AddInventoryItem(tag, amount)`, `InventorySubsystem:TrySetAllConsumableInventoryItemsCooldown(player, 0)`.
+- "Use item" functions are called from C++, so hooking them does not work; Infinite Consumables polls counts and gives back what was used.
+- Death: the character's `DeathmarkRef:ForcePickup()` returns the dropped catalysts; `bRespawning` while respawning.
+
+## Developer cheat manager (`BP_MTCheatManager`)
+
+- Its C++ cheat functions (`GodMode`, `NoClip`, ...) are empty in the release build, and its `Cheat.*` console variables don't exist.
+- Its Blueprint cheat actions (`CheatActions`, by `ActionName`) work: "Unlock Grappling", "Unlock Stasis", "Unlock Neptho Interactions", "Unlock Leveling Up", "Unlock all gems".
+- `IgnoreCostsToggle` works (state in the `AbilitySystem.IgnoreCosts` CVar).
+- Weapon fields: `PlayerSaber`, `WeaponPistol`, `WeaponFlamethrower`, `WeaponRifle`, `WeaponClaymore`, `WeaponBlunderbuss`, `WeaponShield`, `WeaponRapier`, `WeaponStasis` (`player:AcquireWeapon(weapon, true)`). **`WeaponGrenade` (Crystal Grenade) is an unfinished leftover**: it does nothing and takes the Claymore's wheel slot; Overhand removes it from saves (`RangedWeapons`, `MeleeWeapons`, `TwoHandedWeapons`).
+- `UpgradeMaterials`: a tag container of the upgrade materials.
+
+## HUD and menus
+
+- HUD: `WBP_PlayerVitals_C` (owner via `GetOwningPlayerPawn`; the previous one stays valid for a while after a load). `PlayerHealthVitalsBar:Update(fraction)` redraws the bar; its slot width is 2.5 px per point of max health (250 px for 100), so raised max health runs it off screen.
+- `AttributesNotifierComponent:RequestWeaponRefresh()` / `RequestTokenRefresh()` redraw ammo and counters after direct writes.
+- Game menus: `WBP_PauseMenu_C` (**confirmed in game**: blocks our menu), `WBP_PanelSettings_C`, `WBP_PlayerInventory_C`, `WBP_LanternMenu_C`, `WBP_ProgressionMenu_C`, `WBP_PlayerJournal_C`, `WBP_PlayerQuests_C`, `WBP_FastTravel_C`, `WBP_SaveManager_C`, `WBP_DeathScreen_C`, `WBP_PlayerArsenal_C`, `WBP_PlayerStorage_C`, `WBP_MessageBox_C`.
+
+## Input
+
+- Toggle sprint: `GA_Sprint_C.bGamepadInput` makes sprint a toggle (the gamepad behaviour) for the keyboard too.
+- Controller buttons via `PlayerController:IsInputKeyDown` with FKey names (`Gamepad_LeftThumbstick` for L3 **confirmed in game**).
+- **UI-only input mode stops controller buttons from reaching the game** (and so `IsInputKeyDown`), **confirmed in game**. A controller-opened menu uses game-and-UI mode.
+
+## Other mods for this game
+
+| Mod | Overhand | Notes |
+|---|---|---|
+| Valor Mortis Cheat Menu 1.3.2 (BryanHudson) | replaces it (switched off on install) | Basis of several features; its per-tick object searches caused stutter. Versions 1.1.0 and older wrote damage multipliers into saves (Overhand repairs them). |
+| Passive Health Regen (AeonGreyh) | replaces it | Its approach is reimplemented for Health Regeneration. |
+| Defense Multiplier (AeonGreyh) | approach reimplemented for Damage Taken | |
+| UE4SS repack on Nexus | use the official build | Its Lua files and `dwmapi.dll` matched the official build (the DLL differed only in its build header); its `UE4SS.dll` came from an older experimental build no longer downloadable, so it could not be matched. We installed the official build instead. |

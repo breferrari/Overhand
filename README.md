@@ -119,6 +119,17 @@ python tools\smoke_test.py valormortis   # one game
 
 For every game the smoke test assembles the mod the way the installer does, compiles it with Lua 5.4 (what UE4SS embeds), checks the layers, and loads it against mock UE4SS objects: main menu, a loaded save with the features ticking, every row of every tab with keyboard and controller, a map change, and the first-start settings file. It catches syntax, wiring and load errors; game behaviour still needs the game.
 
+## Docs
+
+| | |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, how a game's mod is assembled, every module, the rules |
+| [docs/PORTING.md](docs/PORTING.md) | Adding a game (worked example: Atomic Heart) |
+| [docs/DISCOVERY.md](docs/DISCOVERY.md) | Finding a game's internals with UE4SS: dumps, Live View, hooks, testing, pitfalls, reviewing other mods |
+| [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | What costs what, and the per-path budget |
+| [docs/games/valormortis.md](docs/games/valormortis.md) | Valor Mortis' internals: classes, attributes, damage functions, effects, items, menus |
+| [CHANGELOG.md](CHANGELOG.md) | Every version |
+
 ## Credits
 
 - Parts of the Valor Mortis cheat logic come from **Valor Mortis Cheat Menu** 1.3.2 by BryanHudson (MIT).

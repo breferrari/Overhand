@@ -11,7 +11,9 @@ Overhand keeps every game in one repo: `src/core/` (menu, input, settings, loggi
 | `tools/` | As is: `install.ps1 -Game <name>`, `smoke_test.py` (tests every game), the UE4SS mock. |
 | `games/valormortis/` | The pattern to follow; none of it is installed for another game. |
 
-The real work for a new game is **finding its internals**: which class is the player and his controller, where health and stamina live, which functions deal damage, which widgets are its menus. The framework covers everything else.
+The real work for a new game is **finding its internals**: which class is the player and his controller, where health and stamina live, which functions deal damage, which widgets are its menus. How to do that with UE4SS's dumps and Live View: [DISCOVERY.md](DISCOVERY.md). The framework covers everything else.
+
+**Cheats that need no discovery.** Some Valor Mortis cheats only use Unreal's own engine classes and work in any game with a standard character: Movement Speed (`CharacterMovement.MaxWalkSpeed`), Jump Height (`JumpZVelocity`), Instant Sprint (`MaxAcceleration`), NoClip (fly mode + collision off), Game Speed (global time dilation) and Teleport (actor location). They are in `games/valormortis/features/movement.lua` and `teleport.lua`; when a second game starts, move them into shared code (e.g. `src/engine/`) so every game gets them. Games with their own movement component, or that rewrite speed every frame, may need adjustments. Everything touching the game's own systems (health, damage, items, unlocks) needs discovery.
 
 ## Requirements
 
@@ -22,7 +24,7 @@ The real work for a new game is **finding its internals**: which class is the pl
 
 ### 1. Find the internals
 
-Turn on UE4SS's console and tools (`UE4SS-settings.ini`: `ConsoleEnabled = 1`, `GuiConsoleEnabled = 1`) and use the Live View or the object dumper. Look for:
+Follow [DISCOVERY.md](DISCOVERY.md): dump objects and headers in a loaded save (Ctrl+J, Ctrl+H), map the classes, confirm in Live View. Write what you find in `docs/games/<game>.md` ([valormortis.md](games/valormortis.md) is the example). Look for:
 
 | What | Valor Mortis | Atomic Heart (to find) |
 |---|---|---|
