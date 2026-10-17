@@ -76,11 +76,12 @@ All inside `Mods\Overhand\`:
 
 | Tab | Cheats |
 |---|---|
-| **Survival** | God Mode · Infinite Stamina (optionally only out of combat) · Infinite Nephtoglobin · Fall Damage 100–0 % · Damage Taken 100–10 % (through the game's own resistances) · Max Health up to 5x (the health bar keeps its length) · Health Regeneration 1–50 HP/s with a delay after hits, a heal-up-to limit and an out-of-combat option |
+| **Survival** | God Mode · Infinite Stamina (optionally only out of combat) · Stamina Cost 100–25 % (attacks, dodges, blocks) · Infinite Nephtoglobin · Fall Damage 100–0 % · Damage Taken 100–10 % (through the game's own resistances) · Max Health up to 5x (the health bar keeps its length) · Health Regeneration 1–50 HP/s with a delay after hits, a heal-up-to limit and an out-of-combat option |
 | **Movement** | NoClip (Space or A up, Ctrl, C or B down) · Movement Speed up to 5x · Jump Height up to 10x · Game Speed 0.25–2x · Toggle Sprint for keyboard · Instant Sprint · **Teleport**: 5 saved positions per area |
-| **Combat** | One-Hit Kills · Damage Multiplier up to 10x · Every Block Is A Perfect Parry · Parry Window 0.5–6x · Dodge Window 0.5–4x · Kill All Enemies Nearby (60 m) |
-| **Items** | Infinite Ammo · Infinite Healing Flasks · Infinite Consumables · Infinite Buffs (potions, coatings, pistol boosts) · No Item Cooldowns · Keep Catalysts On Death · No Ability Costs · Refill Everything |
-| **Give** | +1,000 / +10,000 Catalysts · +99 of every upgrade material · +5 of every consumable · Unlock all weapons / abilities / gems · **Give Item**: any consumable, material or instant item, 1–999 at a time (story items are left out so quests can't break) |
+| **Combat** | One-Hit Kills · Damage Multiplier up to 10x · Every Block Is A Perfect Parry (two-handed weapons too) · Claymore Can Parry · Parry Window 0.5–6x · Dodge Window 0.5–4x · Kill All Enemies Nearby (60 m) |
+| **Items** | Infinite Ammo (optionally still reloading) · Infinite Healing Flasks · Infinite Consumables · Infinite Buffs (potions, coatings, pistol boosts) · No Item Cooldowns · Keep Catalysts On Death (also deaths without a deathmark) · No Ability Costs · Free Respec · Refill Everything |
+| **Give** | +1,000 / +10,000 Catalysts · +99 of every upgrade material · +5 of every consumable · Unlock all weapons / abilities / gems · **Give Item**: any consumable, material, instant or quest item from a list, 1–999 at a time (the count is checked afterwards) |
+| **Quests** | Every quest with its state and what its current step asks for (read only) |
 | **Misc** | Turn everything off · Debug logging · Write bug report · Find controller button icons |
 
 Overhand replaces the Valor Mortis Cheat Menu and AeonGreyh's Passive Health Regen; the install switches them off. Damage multipliers left in a save by Cheat Menu 1.1.0 and older are repaired automatically.
@@ -123,7 +124,7 @@ For every game the smoke test assembles the mod the way the installer does, comp
 
 ## Credits
 
-- Parts of the Valor Mortis cheat logic come from **Valor Mortis Cheat Menu** 1.3.2 by BryanHudson (MIT).
+- Parts of the Valor Mortis cheat logic come from **Valor Mortis Cheat Menu** 1.3.2 by BryanHudson (MIT), and several 1.6.0 features follow its 1.4.0 findings, reimplemented.
 - Valor Mortis Health Regeneration (healing through the game's attribute system, the combat check) and Damage Taken (raising resistances) follow **AeonGreyh**'s Passive Health Regen and Defense Multiplier, reimplemented here.
 - [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) by the UE4SS-RE team (MIT).
 - Fonts: [Cinzel](https://github.com/NDISCOVER/Cinzel) by Natanael Gama and [Barlow](https://github.com/jpt/barlow) by Jeremy Tribby, both under the SIL Open Font License 1.1 (`assets/fonts/`).

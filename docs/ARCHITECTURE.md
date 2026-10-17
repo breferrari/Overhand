@@ -94,12 +94,14 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 | `features/defense.lua` | Damage Taken (raises the resistance attributes) |
 | `features/damage.lua` | Hooks on the game's damage functions: God Mode blocking, One-Hit Kills, Damage Multiplier |
 | `features/hud.lua` | The player's HUD widget, health bar updates, health bar length under Max Health |
-| `features/combat.lua` | Combat state, Perfect Parry, Parry Window, Dodge Window, Kill All Enemies Nearby |
+| `features/combat.lua` | Combat state, Perfect Parry, Claymore Can Parry, Parry Window, Dodge Window, Kill All Enemies Nearby |
 | `features/movement.lua` | Movement Speed, Jump Height, Instant Sprint, Toggle Sprint, NoClip, Game Speed |
 | `features/teleport.lua` | Saved positions (`teleports.txt`) |
 | `features/resources.lua` | Infinite Ammo / Flasks / Consumables, No Item Cooldowns, Keep Catalysts, Refill Everything |
 | `features/buffs.lua` | Infinite Buffs |
-| `features/give.lua` | Catalysts, materials, consumables, Give Item catalog, weapons, abilities, gems |
+| `features/give.lua` | Catalysts, materials, consumables, Give Item catalog (with quest items) and its count check, weapons, abilities, gems |
+| `features/progression.lua` | Free Respec (the lantern's respec costs) |
+| `features/quests.lua` | The Quests tab: quests, their state and current step (read only) |
 | `features/dev_actions.lua` | The developers' Blueprint cheat actions; No Ability Costs |
 | `features/saved_values.lua` | Once per world: repairs old cheat menu damage values, restores ledger values |
 

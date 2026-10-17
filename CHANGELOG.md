@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.6.0 (2026-10-17)
+
+New (following Valor Mortis Cheat Menu 1.4.0's findings, reimplemented the Overhand way: no timed object searches, saved values through the ledger, everything back to vanilla when off; **not yet tested in game**):
+- **Stamina Cost** 100–25 % for attacks, dodges and blocks, through the game's own cost multipliers (saved attributes, ledgered). Sprinting is unchanged.
+- **Claymore Can Parry**: block-only weapon data allows parrying and the -10 parry penalty of two-handed weapons is lifted. The weapon data is looked up when the melee weapon changes (1.4.0 searches every 3 s).
+- **Every Block Is A Perfect Parry** now works with two-handed weapons too (it lifts the same penalty).
+- **Infinite Ammo → still reload**: the reserve stays full, the clip is left to the game.
+- **Keep Catalysts On Death** also gives back catalysts lost on deaths that leave no deathmark.
+- **Free Respec**: the lantern's respec costs are 0 while on (a game asset, restored when off; checked every 2 s, not every tick).
+- **Give Item → Quest Items**, with a warning in the description.
+- **Quests** tab (read only): every quest with its state and current step, in a dropdown.
+
+Fixes:
+- **Instant Sprint** only on the ground (in the air it steered away the momentum of jumps and swings).
+- **The first open of a dropdown showed nothing** (it opened, but a widget built hidden is drawn with no size the first time): the dropdowns get one layout pass at build.
+- **Give Item** checks the count a second later and says what changed ("Sharp Coating: still 3 (the game took no more)") instead of a blind "Added".
+- **Amount** counts 1, 2, 3, ... (hold to speed up: steps of 10, then 100) instead of jumping 1, 5, 10, 25.
+
 ## 1.5.0 (2026-10-17): its own look
 
 - **New menu design**, Overhand's own (no longer modelled on AeonGreyh's menus):

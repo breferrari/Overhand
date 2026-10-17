@@ -21,6 +21,7 @@ local Movement = require("game.features.movement")
 local Combat = require("game.features.combat")
 local Buffs = require("game.features.buffs")
 local Give = require("game.features.give")
+local Progression = require("game.features.progression")
 local DevActions = require("game.features.dev_actions")
 local SavedValues = require("game.features.saved_values")
 
@@ -38,6 +39,8 @@ Runner.AddFeature("resources", Resources.Tick)
 Runner.AddFeature("movement", Movement.Tick)
 Runner.AddFeature("combat", Combat.Tick)
 Runner.AddFeature("buffs", Buffs.Tick)
+Runner.AddFeature("free respec", Progression.Tick)
+Runner.AddFeature("give item check", Give.Tick)
 
 Menu.Configure({
     controller = Game.Controller,

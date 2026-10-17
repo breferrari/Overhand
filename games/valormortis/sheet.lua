@@ -1,5 +1,5 @@
 -- games/valormortis/sheet.lua
--- What the menu shows: six tabs, each row bound to a setting or an action of a feature module, with
+-- What the menu shows: seven tabs, each row bound to a setting or an action of a feature module, with
 -- the description the menu shows while the row is selected. Actions need a loaded save unless
 -- marked { anytime = true }.
 
@@ -14,6 +14,7 @@ local Combat = require("game.features.combat")
 local Resources = require("game.features.resources")
 local Give = require("game.features.give")
 local Teleport = require("game.features.teleport")
+local Quests = require("game.features.quests")
 
 local Sheet = {}
 
@@ -57,6 +58,8 @@ local function survivalTab()
             { description = "Stamina stays full: sprint, dodge and attack without running dry." }),
         Menu.Toggle("only out of combat", "staminaOnlyOutOfCombat", { sub = true,
             description = "Infinite Stamina only while you are not fighting. In a fight, stamina works as the game intends." }),
+        Menu.Choice("Stamina Cost", labeled({ { "100% · vanilla", 1 }, { "75%", 0.75 }, { "50%", 0.5 }, { "33%", 0.33 }, { "25%", 0.25 } }),
+            "staminaCost", { description = "What attacks, dodges and blocks cost in stamina, through the game's own cost multipliers. Sprinting is unchanged." }),
         Menu.Toggle("Infinite Nephtoglobin", "infiniteNephtoglobin", { description = "Your Nephtoglobin stays full." }),
         Menu.Choice("Fall Damage", percentOptions({ 1, 0.75, 0.5, 0.25, 0 }, "none"), "fallDamage",
             { description = "How much damage a fall does. At 0% you can drop from any height." }),
@@ -118,7 +121,9 @@ local function combatTab()
         Menu.Choice("Damage Multiplier", factorOptions({ 1, 1.5, 2, 3, 5, 10 }), "damageMultiplier",
             { description = "Multiplies the damage you deal." }),
         Menu.Toggle("Every Block Is A Perfect Parry", "perfectParry",
-            { description = "Any block counts as a perfectly timed parry." }),
+            { description = "Any block counts as a perfectly timed parry, with every weapon (two-handed ones included)." }),
+        Menu.Toggle("Claymore Can Parry", "claymoreParry",
+            { description = "Two-handed weapons can parry with the normal timing, instead of only blocking." }),
         Menu.Choice("Parry Window", factorOptions({ 0.5, 0.75, 1, 1.5, 2, 4, 6 }), "parryWindow",
             { description = "How long the parry timing window lasts. Wider is easier." }),
         Menu.Choice("Dodge Window", factorOptions({ 0.5, 0.75, 1, 1.5, 2, 3, 4 }), "dodgeWindow",
@@ -131,15 +136,19 @@ end
 
 local function itemsTab()
     return {
-        Menu.Toggle("Infinite Ammo", "infiniteAmmo", { description = "The pistol never runs out and never needs a reload." }),
+        Menu.Toggle("Infinite Ammo", "infiniteAmmo", { description = "Your guns never run out and never need a reload." }),
+        Menu.Toggle("still reload", "ammoReload", { sub = true,
+            description = "The reserve stays full, but you reload as usual: the rhythm of the fight stays, the scarcity goes." }),
         Menu.Toggle("Infinite Healing Flasks", "infiniteFlasks", { description = "Drinking a healing flask does not use it up." }),
         Menu.Toggle("Infinite Consumables", "infiniteConsumables",
             { description = "Grenades, syringes and other consumables come back after you use them." }),
         Menu.Toggle("Infinite Buffs", "infiniteBuffs", { description = "Potions, weapon coatings and pistol boosts never wear off." }),
         Menu.Toggle("No Item Cooldowns", "noItemCooldowns", { description = "Items can be used again right away." }),
-        Menu.Toggle("Keep Catalysts On Death", "keepCatalysts",
-            { description = "After a death, your dropped catalysts are picked up for you as soon as you are back on your feet." }),
+        Menu.Toggle("Keep Catalysts On Death", "keepCatalysts", { description =
+            "After a death your catalysts come back as soon as you are on your feet, also from deaths that leave no deathmark." }),
         Menu.Toggle("No Ability Costs", "noAbilityCosts", { description = "Abilities cost nothing to use." }),
+        Menu.Toggle("Free Respec", "freeRespec",
+            { description = "Resetting your upgrades in the lantern's level-up menu costs no catalysts." }),
         Menu.Section("Actions"),
         Menu.Action("Refill everything", Resources.RefillEverything,
             { description = "Health, flasks, ammo and consumables back to full, like resting at a lantern." }),
@@ -151,7 +160,7 @@ local NOT_UNDONE = " This can not be undone."
 
 local function giveTab()
     local entry = Menu.Value(nil)
-    local amount = Menu.Value(5)
+    local amount = Menu.Value(1)
     local categoryOptions = {}
     for _, category in ipairs(Give.CATEGORIES) do categoryOptions[#categoryOptions + 1] = { label = category.label, value = category.label } end
     local category = Menu.Value(categoryOptions[1].value)
@@ -188,13 +197,25 @@ local function giveTab()
         Menu.Action("Unlock all abilities", Give.AllAbilities, { confirm = "Unlocks every ability on this save." .. NOT_UNDONE }),
         Menu.Action("Unlock all gems", Give.AllGems, { confirm = "Adds every gem to this save." .. NOT_UNDONE }),
         Menu.Section("Give Item"),
-        Menu.Choice("Category", categoryOptions, selectCategory, { description = "What kind of item to give." }),
+        Menu.Choice("Category", categoryOptions, selectCategory, { description =
+            "What kind of item to give. Quest Items: only give what a stuck quest needs; too early can skip parts of a quest." }),
         Menu.Choice("Item", itemOptions, entry, { list = true,
             description = "The item to give. Press to pick it from the list." }),
-        Menu.Choice("Amount", labeled({ { "1", 1 }, { "5", 5 }, { "10", 10 }, { "25", 25 }, { "50", 50 },
-            { "99", 99 }, { "250", 250 }, { "999", 999 } }), amount, { wrap = false, description = "How many to give." }),
+        Menu.Number("Amount", amount, { minimum = 1, maximum = 999,
+            description = "How many to give. Hold left or right to count faster." }),
         Menu.Action("Give", function() Give.Item(entry.get(), amount.get()) end,
             { description = "Gives the chosen amount of the chosen item." }),
+    }
+end
+
+local function questsTab()
+    local quest = Menu.Value(nil)
+    return {
+        Menu.Choice("Quest", Quests.Options, quest, { list = true,
+            description = "Every quest in the game: active first, then not started, then done. Press to pick one." }),
+        Menu.Info(function() return Quests.Describe(quest.get()) end),
+        Menu.Action("Refresh the list", Quests.Refresh, { description = "Reads the quests again (after progress)." }),
+        Menu.Info(function() return "Read only: changing quests from outside breaks the game's quest system. A missing quest item: Give > Quest Items." end),
     }
 end
 
@@ -227,6 +248,7 @@ function Sheet.Build()
     Menu.AddTab("Combat", combatTab())
     Menu.AddTab("Items", itemsTab())
     Menu.AddTab("Give", giveTab())
+    Menu.AddTab("Quests", questsTab())
     Menu.AddTab("Misc", miscTab())
 end
 

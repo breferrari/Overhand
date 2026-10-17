@@ -31,15 +31,15 @@ Valor Mortis uses the Gameplay Ability System. `BaseValue` is saved with the gam
 | Set (property on `AttributesNotifierComponent`) | Attributes we use |
 |---|---|
 | `HealthAttributes` | `Health`, `MaxHealth`, `MeleeResistance`, `RangedResistance`, `ExplosiveResistance`, `MagicResistance` (all four readable, **confirmed in game**), `DamageMultiplier` (does not change damage taken, per the Cheat Menu's tests) |
-| `StaminaAttributes` | `Stamina`, `MaxStamina` |
+| `StaminaAttributes` | `Stamina`, `MaxStamina`, `StaminaMeleeCostMultiplier` / `StaminaDodgeCostMultiplier` / `StaminaBlockCostMultiplier` (base values, saved; what the game's upgrades change; used by Stamina Cost) |
 | `BloodAttributes` | `BloodPoints`, `MaxBloodPoints` (Nephtoglobin) |
 | `FlasksAttributes` | `HealingFlasks`, `HealingFlasksMax` |
 | `RangedAttributes` | `PistolAmmo` / `BlunderbussAmmo` / `RifleAmmo`, `...AmmoInClip`, `Max...`, `RangedDamageMultiplier` |
-| `ExpAttributes` | `ExpPoints` |
+| `ExpAttributes` | `ExpPoints` (catalysts) |
 
 | Set found by class (owned by the character) | |
 |---|---|
-| `MeleeAttributeSet` | `MeleeDamageMultiplier`, `ParryWindowAdjustment` (what the "Forgiving Parry" gem raises) |
+| `MeleeAttributeSet` | `MeleeDamageMultiplier`, `ParryWindowAdjustment` (what the "Forgiving Parry" gem raises; the game drops it to -10 while a two-handed weapon is equipped) |
 | `MovementAttributeSet` | (not used) |
 
 - **Resistances:** a resistance `r` lets `1 - r` of the damage through. Raising `CurrentValue` reduces damage (Damage Taken, **confirmed in game**: 50 % halves hits).
@@ -74,10 +74,21 @@ Valor Mortis uses the Gameplay Ability System. `BaseValue` is saved with the gam
 
 ## Items and inventory
 
-- `InventorySubsystem.InventoryDatabaseAsset`: maps `ConsumableItemsMap`, `MaterialItemsMap`, `InstantItemsMap`, `NarrativeItemsMap` (story items; left out of Give Item). Each maps a category tag to an `ItemMap` of real items. 34 consumables, 14 materials, 7 instant items (**confirmed in game**). In-game names in `UIData.TextStats`.
+- `InventorySubsystem.InventoryDatabaseAsset`: maps `ConsumableItemsMap`, `MaterialItemsMap`, `InstantItemsMap`, `NarrativeItemsMap` (quest items; Give Item's Quest Items category, with the tags in `QuestAction_GrantItems` / `QuestAction_RemoveItems` `ItemTags`). Each maps a category tag to an `ItemMap` of real items. 34 consumables, 14 materials, 7 instant items (**confirmed in game**). In-game names in `UIData.TextStats`.
 - `SaveSubsystem:TryGetInventoryItemCount(tag)`, `InventorySubsystem:AddInventoryItem(tag, amount)`, `InventorySubsystem:TrySetAllConsumableInventoryItemsCooldown(player, 0)`.
 - "Use item" functions are called from C++, so hooking them does not work; Infinite Consumables polls counts and gives back what was used.
-- Death: the character's `DeathmarkRef:ForcePickup()` returns the dropped catalysts; `bRespawning` while respawning.
+- Give Item: `AddInventoryItem` can return without adding (both early tests: a coating already at 3 stayed at 3), so Overhand reads the count again a second later and reports what changed. Whether that was a carry limit or a lagging count is still to find out.
+- Death: the character's `DeathmarkRef:ForcePickup()` returns the dropped catalysts; `bRespawning` while respawning. Some deaths (poison, some bosses) leave no deathmark and still take the catalysts; `MTCombatUtils:AddExperiencePointsToPlayer(n)` gives catalysts.
+
+## Weapons, progression and quests
+
+From Valor Mortis Cheat Menu 1.4.0's findings (BryanHudson), reimplemented; **not yet confirmed in game** by us.
+
+- `MeleeWeaponPrimaryDataAsset.BlockAllowedType`: 0 = block and parry, 1 = block only (the Claymore and other two-handed weapons). A game asset, not saved. Overhand looks the assets up when William's melee weapon changes, not on a timer.
+- The equipped melee weapon (`CurrentMeleeWeapon`) has `PerfectParryCooldown` and `PerfectParrySpamReduction`.
+- `CharacterProgressionDatabase.RespecCosts`: a map level -> catalyst cost for resetting upgrades at a lantern. A game asset, not saved (Free Respec writes 0, restores the costs when off).
+- `CharacterMovement.MovementMode`: 1 walking, 2 nav walking, 3 falling, 5 flying. Instant Sprint applies only on the ground (in the air the huge acceleration steered away jump and swing momentum).
+- `QuestSubsystem`: `GameQuests` (tag -> quest), `ActiveQuests`; a quest's `QuestTitle`, `PersistentState` (`bQuestActive`, `bQuestCompleted`, `CurrentQuestStepIndex`), `CurrentQuestStep.StepDescription`. `EndQuest` / `ResetQuest` from outside crash the quest system, so the Quests tab only reads.
 
 ## Developer cheat manager (`BP_MTCheatManager`)
 
@@ -103,7 +114,7 @@ Valor Mortis uses the Gameplay Ability System. `BaseValue` is saved with the gam
 
 | Mod | Overhand | Notes |
 |---|---|---|
-| Valor Mortis Cheat Menu 1.3.2 (BryanHudson) | replaces it (switched off on install) | Basis of several features; its per-tick object searches caused stutter. Versions 1.1.0 and older wrote damage multipliers into saves (Overhand repairs them). |
+| Valor Mortis Cheat Menu 1.4.0 (BryanHudson) | replaces it (switched off on install) | Basis of several features; its per-tick object searches caused stutter (1.4.0 adds more: weapon data every 3 s). Versions 1.1.0 and older wrote damage multipliers into saves (Overhand repairs them); 1.0.x stacked Max Health into saves (not something Overhand ever did). |
 | Passive Health Regen (AeonGreyh) | replaces it | Its approach is reimplemented for Health Regeneration. |
 | Defense Multiplier (AeonGreyh) | approach reimplemented for Damage Taken | |
 | UE4SS repack on Nexus | use the official build | Its Lua files and `dwmapi.dll` matched the official build (the DLL differed only in its build header); its `UE4SS.dll` came from an older experimental build no longer downloadable, so it could not be matched. We installed the official build instead. |

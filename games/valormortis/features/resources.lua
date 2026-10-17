@@ -1,6 +1,6 @@
 -- games/valormortis/features/resources.lua
--- Infinite Ammo, Healing Flasks and Consumables, No Item Cooldowns, Keep Catalysts On Death and
--- Refill Everything.
+-- Infinite Ammo (optionally still reloading), Healing Flasks and Consumables, No Item Cooldowns,
+-- Keep Catalysts On Death and Refill Everything.
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
@@ -25,13 +25,16 @@ end
 
 local AMMO_TYPES = { "Pistol", "Blunderbuss", "Rifle" }
 
-function Resources.FillAmmo()
+-- reserveOnly: keep the reserve full but leave the clip to the game (you still reload).
+function Resources.FillAmmo(reserveOnly)
     local rangedSet = Game.AttributeSet("Ranged")
     if not rangedSet then return end
     local changed = false
     for _, ammoType in ipairs(AMMO_TYPES) do
         if Gas.FillAttribute(rangedSet, ammoType .. "Ammo", "Max" .. ammoType .. "Ammo") then changed = true end
-        if Gas.FillAttribute(rangedSet, ammoType .. "AmmoInClip", "Max" .. ammoType .. "AmmoInClip") then changed = true end
+        if not reserveOnly and Gas.FillAttribute(rangedSet, ammoType .. "AmmoInClip", "Max" .. ammoType .. "AmmoInClip") then
+            changed = true
+        end
     end
     -- Values written directly do not reach the HUD by themselves.
     if changed then
@@ -55,21 +58,69 @@ local function resetItemCooldowns()
     end
 end
 
--- Once William is back on his feet, pick his deathmark up for him right away.
-local deathmarkRetryAt = {}   -- deathmark address -> clock time of the next pickup attempt
+-- Keep Catalysts On Death. Once William is back on his feet, his deathmark is picked up for him
+-- right away. Some deaths leave no deathmark (poison, some boss fights) and still take the
+-- catalysts: for those, the catalysts he had just before dying are given back. Catalysts are the Exp
+-- set's ExpPoints; giving goes through the game's own AddExperiencePointsToPlayer.
+local DEATHMARK_GRACE = 3         -- seconds after getting up for the game to place its deathmark
+local GIVE_BACK_WITHIN = 60       -- a longer death (menus, loading) is not ours to judge
+local catalysts = {
+    deathmarkRetryAt = {},        -- deathmark address -> clock time of the next pickup attempt
+    lastCount = nil,              -- catalysts while alive, read every tick
+    beforeDeath = nil,            -- catalysts when he died
+    diedAt = nil,
+    checkAt = nil,                -- after getting up: when to compare
+    sawDeathmark = false,         -- this death left a deathmark (picking it up gives them back)
+}
 
-local function pickUpDeathmark()
-    local player = Game.Player()
-    if not player or not Game.IsPlayerAlive() then return end
-    if try(function() return player.bRespawning end) == true then return end
+local function catalystCount()
+    local expSet = Game.AttributeSet("Exp")
+    return expSet and Gas.GetAttribute(expSet, "ExpPoints")
+end
+
+local function pickUpDeathmark(player)
     local deathmark = try(function() return player.DeathmarkRef end)
     if not isValid(deathmark) then return end
+    catalysts.sawDeathmark = true
     local address = Unreal.AddressOf(deathmark)
-    if os.clock() < (deathmarkRetryAt[address] or 0) then return end
-    deathmarkRetryAt[address] = os.clock() + 3
+    if os.clock() < (catalysts.deathmarkRetryAt[address] or 0) then return end
+    catalysts.deathmarkRetryAt[address] = os.clock() + 3
     if try(function() deathmark:ForcePickup() return true end) then
         Log.Info("deathmark picked up (catalysts kept)")
     end
+end
+
+local function giveBackLostCatalysts()
+    local now, count = catalystCount(), catalysts.beforeDeath
+    catalysts.beforeDeath, catalysts.checkAt = nil, nil
+    if catalysts.sawDeathmark or not (now and count) or now >= count - 0.5 then return end
+    local missing = math.floor(count - now + 0.5)
+    local combatUtils = Game.CombatUtils()
+    local given = isValid(combatUtils) and try(function() combatUtils:AddExperiencePointsToPlayer(missing) return true end)
+    Log.Info("keep catalysts: " .. (given and "gave back " or "could not give back ") .. missing .. " catalysts lost on a death without a deathmark")
+end
+
+local function keepCatalysts()
+    local player = Game.Player()
+    if not player then return end
+    local alive = Game.IsPlayerAlive() and try(function() return player.bRespawning end) ~= true
+    if not alive then
+        if not catalysts.diedAt then
+            catalysts.diedAt, catalysts.beforeDeath, catalysts.sawDeathmark = os.clock(), catalysts.lastCount, false
+        end
+        return
+    end
+    if catalysts.diedAt then
+        if os.clock() - catalysts.diedAt < GIVE_BACK_WITHIN then catalysts.checkAt = os.clock() + DEATHMARK_GRACE end
+        catalysts.diedAt = nil
+    end
+    pickUpDeathmark(player)
+    if catalysts.checkAt and os.clock() >= catalysts.checkAt then giveBackLostCatalysts() end
+    if not catalysts.checkAt then catalysts.lastCount = catalystCount() end
+end
+
+local function forgetCatalysts()
+    catalysts.lastCount, catalysts.beforeDeath, catalysts.diedAt, catalysts.checkAt = nil, nil, nil, nil
 end
 
 -- ---------------------------------------------------------------------------
@@ -196,14 +247,15 @@ end
 function Resources.Tick()
     local settings = App.settings
     if settings.infiniteFlasks then Resources.FillFlasks() end
-    if settings.infiniteAmmo then Resources.FillAmmo() end
+    if settings.infiniteAmmo then Resources.FillAmmo(settings.ammoReload) end
     if settings.noItemCooldowns then resetItemCooldowns() end
-    if settings.keepCatalysts then pickUpDeathmark() end
+    if settings.keepCatalysts then Log.Guarded("keep catalysts", keepCatalysts) else forgetCatalysts() end
     pollConsumables()
 end
 
 Unreal.OnWorldReset(function()
-    deathmarkRetryAt = {}
+    catalysts.deathmarkRetryAt = {}
+    forgetCatalysts()
     -- peak counts too: after loading another save, Refill must not top it up to this one's counts
     consumables.lastCounts, consumables.unrefillable, consumables.verifyNextPoll, consumables.peakCounts = {}, {}, {}, {}
 end)

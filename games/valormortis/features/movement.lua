@@ -113,8 +113,11 @@ local function applyMovementOverrides(movement)
     if speedOverride:isActive() then speedOverride:property(movement, "MaxWalkSpeedCrouched", settings.movementSpeed) end
     -- Jump height grows with the square of the launch speed.
     applyOverride(jumpOverride, settings.jumpHeight ~= 1, movement, "JumpZVelocity", math.sqrt(settings.jumpHeight))
-    -- Instant Sprint: full speed the moment you start running (no speed-up phase)
-    applyOverride(accelerationOverride, walking and settings.instantSprint, movement, "MaxAcceleration", INSTANT_ACCELERATION)
+    -- Instant Sprint: full speed the moment you start running (no speed-up phase). On the ground
+    -- only: in the air the huge acceleration would steer away the momentum of jumps and swings.
+    local mode = Unreal.TryNumber(function() return movement.MovementMode end)
+    local onGround = mode == Game.MOVEMENT_MODE.WALKING or mode == Game.MOVEMENT_MODE.NAV_WALKING
+    applyOverride(accelerationOverride, walking and onGround and settings.instantSprint, movement, "MaxAcceleration", INSTANT_ACCELERATION)
 end
 
 local appliedGameSpeed = 1

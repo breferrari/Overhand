@@ -124,8 +124,11 @@ local view = {
 -- ---------------------------------------------------------------------------
 
 local function isSelectable(item)
-    return item.kind == "toggle" or item.kind == "choice" or item.kind == "action"
+    return item.kind == "toggle" or item.kind == "choice" or item.kind == "number" or item.kind == "action"
 end
+
+-- A row drawn as ◂ value ▸.
+local function isStepped(item) return item.kind == "choice" or item.kind == "number" end
 
 local function sameValue(a, b)
     if type(a) == "number" and type(b) == "number" then return math.abs(a - b) < 1e-6 end
@@ -158,7 +161,7 @@ end
 
 function Menu.Section(title) return { kind = "section", label = title } end
 
--- A line of text; textOf() is read on every refresh.
+-- A line of text (wraps when long); textOf() is read on every refresh.
 function Menu.Info(textOf) return { kind = "info", text = textOf } end
 
 -- Every row takes, in its options: description (shown while it is selected), sub = true (drawn as a
@@ -195,6 +198,17 @@ function Menu.Choice(label, options, keyOrAccessor, display)
     return row("choice", label, display, {
         options = options, get = accessor.get, set = accessor.set, isChanged = accessor.isChanged,
         list = display.list == true, wrap = display.wrap ~= false,
+    })
+end
+
+-- A whole number from options.minimum to options.maximum: ◂ ▸ step by 1, and holding the button
+-- speeds up (steps of 10, then 100). options also takes description, sub, onChange.
+function Menu.Number(label, keyOrAccessor, options)
+    options = options or {}
+    local accessor = accessorFor(keyOrAccessor, options.onChange)
+    return row("number", label, options, {
+        get = accessor.get, set = accessor.set, isChanged = accessor.isChanged,
+        minimum = options.minimum or 1, maximum = options.maximum or 999,
     })
 end
 
@@ -259,6 +273,28 @@ end
 
 local function pickOption(item, option) item.set(option.value) end
 
+-- Held ◂ / ▸ on a number (repeats arrive quickly one after another): after a while the step grows.
+local HELD_GAP = 0.3                        -- seconds between repeats that still count as held
+local STEP_AFTER = { { repeats = 25, step = 100 }, { repeats = 8, step = 10 } }
+local held = { item = nil, direction = 0, at = 0, repeats = 0 }
+
+local function stepNumber(item, direction)
+    local now = os.clock()
+    if held.item == item and held.direction == direction and now - held.at < HELD_GAP then
+        held.repeats = held.repeats + 1
+    else
+        held.item, held.direction, held.repeats = item, direction, 0
+    end
+    held.at = now
+    local step = 1
+    for _, rule in ipairs(STEP_AFTER) do
+        if held.repeats >= rule.repeats then step = rule.step break end
+    end
+    local value = (tonumber(item.get()) or item.minimum) + direction * step
+    if step > 1 then value = math.floor(value / step + (direction < 0 and 0.999 or 0)) * step end   -- land on round numbers
+    item.set(math.max(item.minimum, math.min(item.maximum, value)))
+end
+
 local function changeValue(direction)
     local item = selected()
     if not item then return end
@@ -274,6 +310,8 @@ local function changeValue(direction)
             index = math.max(1, math.min(#options, index))
         end
         pickOption(item, options[index])
+    elseif item.kind == "number" then
+        stepNumber(item, direction)
     end
 end
 
@@ -418,7 +456,6 @@ local function buildList(tree, page, name)
     end
     local outline = Widgets.Outlined(tree, name .. "ListOutline", panel, COLORS.descriptionEdge)
     Widgets.Pad(page:AddChild(outline), SIDE_PADDING + 14, 2, SIDE_PADDING, 6)
-    Widgets.SetVisible(outline, false)
     return { box = outline, lines = lines, shown = {} }
 end
 
@@ -439,7 +476,7 @@ local function buildRow(tree, page, name, item)
         local box
         box, rowWidgets.toggle = buildToggle(tree, name .. "Toggle")
         addCentered(content, box)
-    elseif item.kind == "choice" then
+    elseif isStepped(item) then
         local box
         box, rowWidgets.choice = buildChoice(tree, name, item)
         addCentered(content, box)
@@ -469,7 +506,7 @@ local function buildPage(tree, column, tabIndex, tab)
         if item.kind == "section" then
             buildSection(tree, page, name, item.label, index == 1)
         elseif item.kind == "info" then
-            local text = Widgets.Text(tree, name, "", FONT_SIZE.info, COLORS.muted)
+            local text = Widgets.Text(tree, name, "", FONT_SIZE.info, COLORS.muted, { wrap = true })
             Widgets.Pad(page:AddChild(text), SIDE_PADDING, 6, SIDE_PADDING, 2)
             rows[index] = { info = text }
         else
@@ -660,6 +697,15 @@ local function build(controller)
     local footer = buildFooter(tree, column)
 
     try(function() root:AddToViewport(1000) end)
+    -- A widget that starts hidden is never laid out, and the first time it is shown Slate draws it
+    -- with no size (the first open of a dropdown showed nothing). So the dropdowns get one layout
+    -- pass while visible, then are hidden until opened.
+    try(function() root:ForceLayoutPrepass() end)
+    for _, page in ipairs(pages) do
+        for _, rowWidgets in pairs(page.rows) do
+            if rowWidgets.list then Widgets.SetVisible(rowWidgets.list.box, false) end
+        end
+    end
     if (Widgets.fonts.display or Widgets.fonts.body) and not textRenders({ title, tabWidgets[1] and tabWidgets[1].label }) then
         Log.Info("menu fonts: the theme's fonts laid out empty (the engine could not read them); using the engine font")
         themeFontsFailed = true
@@ -743,7 +789,9 @@ end
 -- The open dropdown's lines: the highlighted option lit, the current one marked.
 local function drawList(list, item, options, current)
     local open = view.list ~= nil and view.list.item == item
-    setVisible(list.shown, "visible", list.box, open)
+    local visibilityChanged = changed(list.shown, "visible", open)
+    if visibilityChanged then Widgets.SetVisible(list.box, open) end
+    local justOpened = visibilityChanged and open
     if not open then return end
     for index, line in ipairs(list.lines) do
         local optionIndex = view.list.first + index - 1
@@ -759,6 +807,7 @@ local function drawList(list, item, options, current)
             end
         end
     end
+    if justOpened then try(function() list.box:ForceLayoutPrepass() end) end
 end
 
 local function drawChoice(rowWidgets, item, isChangedNow)
@@ -770,6 +819,10 @@ local function drawChoice(rowWidgets, item, isChangedNow)
     local quiet = item.isChanged ~= nil and not isChangedNow
     setTextColor(rowWidgets.shown, "valueColor", value, quiet and COLORS.muted or COLORS.title)
     if rowWidgets.list then drawList(rowWidgets.list, item, options, current) end
+end
+
+local function drawNumber(rowWidgets, item)
+    setText(rowWidgets.shown, "value", rowWidgets.choice.value, tostring(item.get() or "-"))
 end
 
 local function drawAction(rowWidgets, item, isSelected)
@@ -790,6 +843,8 @@ local function drawRow(rowWidgets, item, isSelected)
     end
     if rowWidgets.toggle then
         drawToggle(rowWidgets, item)
+    elseif item.kind == "number" then
+        drawNumber(rowWidgets, item)
     elseif rowWidgets.choice then
         drawChoice(rowWidgets, item, isChangedNow)
     else
@@ -833,7 +888,7 @@ local function hintText(verb, item)
         if item.kind == "toggle" then return "toggle" end
         if item.kind == "choice" and item.list then return "list" end
         if item.kind == "action" then return view.pendingConfirm == item and "confirm" or "use" end
-    elseif verb == "change" and item.kind == "choice" then
+    elseif verb == "change" and isStepped(item) then
         return "change"
     end
     return nil

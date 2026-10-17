@@ -1,6 +1,6 @@
 -- games/valormortis/features/health.lua
--- Survival: God Mode, Infinite Stamina / Nephtoglobin, Fall Damage, Max Health and Health
--- Regeneration. (Damage Taken is features/defense.lua.)
+-- Survival: God Mode, Infinite Stamina / Nephtoglobin, Stamina Cost, Fall Damage, Max Health and
+-- Health Regeneration. (Damage Taken is features/defense.lua.)
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
@@ -223,6 +223,29 @@ local function regenerateHealth()
 end
 
 -- ---------------------------------------------------------------------------
+-- Stamina Cost: attacks, dodges and blocks cost a share of their normal stamina, through the
+-- game's own cost multipliers on the stamina set (the ones its upgrades change; saved, so through
+-- the ledger). Sprinting keeps its normal cost: its drain is not one of these multipliers.
+-- (Found by Valor Mortis Cheat Menu 1.4.0; not yet confirmed in game here.)
+-- ---------------------------------------------------------------------------
+
+local staminaCostOverride = Override.new()
+local STAMINA_COST_ATTRIBUTES = { "StaminaMeleeCostMultiplier", "StaminaDodgeCostMultiplier", "StaminaBlockCostMultiplier" }
+
+local function applyStaminaCost()
+    local factor = App.settings.staminaCost or 1
+    if factor == 1 then
+        if staminaCostOverride:isActive() then staminaCostOverride:restore() end
+        return
+    end
+    local staminaSet = Game.AttributeSet("Stamina")
+    if not staminaSet then return end
+    for _, attributeName in ipairs(STAMINA_COST_ATTRIBUTES) do
+        staminaCostOverride:apply(Gas.BASE_VALUE, staminaSet, attributeName, factor)
+    end
+end
+
+-- ---------------------------------------------------------------------------
 
 function Health.Tick()
     local settings = App.settings
@@ -230,6 +253,7 @@ function Health.Tick()
     if settings.infiniteStamina and not (settings.staminaOnlyOutOfCombat and Combat.IsInCombat()) then
         Health.FillStamina()
     end
+    Log.Guarded("stamina cost", applyStaminaCost)
     if settings.infiniteNephtoglobin then Health.FillNephtoglobin() end
     -- God Mode covers falls too: fall damage does not go through the damage functions we hook.
     if (settings.fallDamage or 1) <= 0 or settings.godMode or os.clock() < Shared.safeLandingUntil then
@@ -243,6 +267,7 @@ end
 
 Unreal.OnWorldReset(function()
     maxHealthOverride:release()
+    staminaCostOverride:release()
     lastWrittenMaxHealth = nil
     regen.lastHealth, regen.lastStepAt = nil, nil
     -- fallCurve is not reset: the curve is a game asset that outlives the world, and resetting would

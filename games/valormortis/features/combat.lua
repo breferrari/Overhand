@@ -1,5 +1,6 @@
 -- games/valormortis/features/combat.lua
--- Combat state, Every Block Is A Perfect Parry, Parry Window, Dodge Window and Kill All Enemies Nearby.
+-- Combat state, Every Block Is A Perfect Parry, Claymore Can Parry, Parry Window, Dodge Window and
+-- Kill All Enemies Nearby.
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
@@ -49,27 +50,75 @@ function Combat.IsInCombat()
 end
 
 -- ---------------------------------------------------------------------------
--- Every Block Is A Perfect Parry: a huge parry window on William's side (the attribute the
--- "Forgiving Parry" gem raises) and no parry cooldown / spam penalty on his weapon.
+-- Parrying. William's ParryWindowAdjustment (the attribute the "Forgiving Parry" gem raises, a
+-- saved base value) widens or narrows his parry window. Two-handed weapons cannot parry: their
+-- weapon data says "block only" (BlockAllowedType), and while one is equipped the game drops
+-- ParryWindowAdjustment to -10.
+--   Claymore Can Parry: block-only weapon data allows parrying, and an adjustment below
+--     NO_PARRY_BELOW is lifted to the normal window (0).
+--   Every Block Is A Perfect Parry: does the same for two-handed weapons (every block means every
+--     block), adds EXTRA_PARRY_WINDOW, and takes the parry cooldown / spam penalty off the weapon.
+-- The weapon data is a game asset (nothing saved); it is searched only when William's melee weapon
+-- changes, and the old value comes back when both options are off.
+-- (From Valor Mortis Cheat Menu 1.4.0's findings; not yet confirmed in game here.)
 -- ---------------------------------------------------------------------------
 
-local perfectParryOverride = Override.new()
+local parryWindowOverride = Override.new()   -- ParryWindowAdjustment (saved, ledgered)
+local parryWeaponOverride = Override.new()   -- the equipped weapon's parry cooldown / spam penalty
+local blockTypeOverride = Override.new()     -- block-only weapon data
 local EXTRA_PARRY_WINDOW = 5.0
+local NO_PARRY_BELOW = -1
+local BLOCK_AND_PARRY, BLOCK_ONLY = 0, 1
 
-local function applyPerfectParry()
-    if not App.settings.perfectParry then
-        if perfectParryOverride:isActive() then perfectParryOverride:restore() end
+local weaponData = { forWeapon = nil, assets = {} }   -- melee weapon data, found for this weapon address
+
+local function canParryAnyWeapon() return App.settings.claymoreParry or App.settings.perfectParry end
+
+-- The melee weapon data assets that are block only (searched again when the weapon changes: data
+-- for a weapon is loaded with it).
+local function blockOnlyWeaponData(weapon)
+    local address = Unreal.AddressOf(weapon)
+    if address == weaponData.forWeapon then return weaponData.assets end
+    weaponData.forWeapon, weaponData.assets = address, {}
+    for _, asset in ipairs(Unreal.FindAllLive("MeleeWeaponPrimaryDataAsset")) do
+        if Unreal.TryNumber(function() return asset.BlockAllowedType end) == BLOCK_ONLY then
+            weaponData.assets[#weaponData.assets + 1] = asset
+        end
+    end
+    Log.Limited("block only weapons", 3, "parry: " .. #weaponData.assets .. " block-only weapon data assets")
+    return weaponData.assets
+end
+
+local function restoreParry()
+    if parryWindowOverride:isActive() then parryWindowOverride:restore() end
+    if parryWeaponOverride:isActive() then parryWeaponOverride:restore() end
+    if blockTypeOverride:isActive() then blockTypeOverride:restore() end
+end
+
+local function applyParry()
+    local settings = App.settings
+    if not canParryAnyWeapon() then
+        restoreParry()
         return
     end
     local meleeSet = Game.AttributeSet("Melee")
     if meleeSet then
-        perfectParryOverride:apply(Gas.BASE_VALUE, meleeSet, "ParryWindowAdjustment", function(base) return base + EXTRA_PARRY_WINDOW end)
+        parryWindowOverride:apply(Gas.BASE_VALUE, meleeSet, "ParryWindowAdjustment", function(base)
+            local adjustment = base < NO_PARRY_BELOW and 0 or base
+            return settings.perfectParry and adjustment + EXTRA_PARRY_WINDOW or adjustment
+        end)
     end
     local player = Game.Player()
     local weapon = player and try(function() return player.CurrentMeleeWeapon end)
-    if isValid(weapon) then
-        perfectParryOverride:property(weapon, "PerfectParryCooldown", 0)
-        perfectParryOverride:property(weapon, "PerfectParrySpamReduction", 0)
+    if not isValid(weapon) then return end
+    for _, asset in ipairs(blockOnlyWeaponData(weapon)) do
+        blockTypeOverride:property(asset, "BlockAllowedType", function() return BLOCK_AND_PARRY end)
+    end
+    if settings.perfectParry then
+        parryWeaponOverride:property(weapon, "PerfectParryCooldown", 0)
+        parryWeaponOverride:property(weapon, "PerfectParrySpamReduction", 0)
+    elseif parryWeaponOverride:isActive() then
+        parryWeaponOverride:restore()
     end
 end
 
@@ -211,12 +260,15 @@ end
 
 function Combat.Tick()
     if (App.settings.parryWindow or 1) ~= 1 then registerParryHooks() end
-    applyPerfectParry()
+    Log.Guarded("parry", applyParry)
     Log.Guarded("dodge window", applyDodgeWindow)
 end
 
 Unreal.OnWorldReset(function()
-    perfectParryOverride:release()
+    parryWindowOverride:release()
+    parryWeaponOverride:release()
+    blockTypeOverride:release()
+    weaponData.forWeapon, weaponData.assets = nil, {}
     dodges.handled, dodges.lastEffectCount, dodges.removalPending = {}, -1, false
     combatState.checkedAt = -math.huge
 end)

@@ -11,7 +11,7 @@ local Gas = require("gas.gas")
 local Game = {}
 
 -- CharacterMovement.MovementMode values.
-Game.MOVEMENT_MODE = { FALLING = 3, FLYING = 5 }
+Game.MOVEMENT_MODE = { WALKING = 1, NAV_WALKING = 2, FALLING = 3, FLYING = 5 }
 
 local try, isValid, addressOf = Unreal.Try, Unreal.IsValid, Unreal.AddressOf
 

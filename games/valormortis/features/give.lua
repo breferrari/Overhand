@@ -56,14 +56,16 @@ function Give.EveryConsumable(amount)
 end
 
 -- ---------------------------------------------------------------------------
--- Give Item: one item from the game's item database, any amount. Story items (NarrativeItemsMap)
--- are left out on purpose: they can break quests.
+-- Give Item: one item from the game's item database, any amount. Quest items (NarrativeItemsMap,
+-- plus the items quests hand out or take back) are their own category: they help with a stuck
+-- quest, but given too early they can skip parts of one.
 -- ---------------------------------------------------------------------------
 
 Give.CATEGORIES = {
     { label = "Consumables", databaseMap = "ConsumableItemsMap" },
     { label = "Materials", databaseMap = "MaterialItemsMap" },
     { label = "Instant", databaseMap = "InstantItemsMap" },
+    { label = "Quest Items", databaseMap = "NarrativeItemsMap", questActions = { "QuestAction_GrantItems", "QuestAction_RemoveItems" } },
 }
 
 local catalog = nil   -- category label -> sorted list of { label, tag }
@@ -71,7 +73,7 @@ local catalog = nil   -- category label -> sorted list of { label, tag }
 -- "Items.Consumable.Grenade.Oil" -> "Grenade Oil"
 local GENERIC_TAG_PARTS = {
     Items = true, Item = true, Inventory = true, Consumable = true, Consumables = true,
-    Material = true, Materials = true, Instant = true, Upgrade = true, Upgrades = true,
+    Material = true, Materials = true, Instant = true, Upgrade = true, Upgrades = true, Narrative = true, Quest = true,
 }
 
 local function readableTag(tag)
@@ -113,15 +115,40 @@ function Give.Catalog()
             -- the materials the cheat manager lists, in case the database misses some
             for _, tag in ipairs(upgradeMaterialTags()) do add(tag, nil) end
         end
+        -- the items the quests themselves grant or take (one search per class, when the catalog is built)
+        for _, className in ipairs(category.questActions or {}) do
+            for _, action in ipairs(Unreal.FindAllLive(className)) do
+                for _, tag in ipairs(Gas.TagNamesIn(try(function() return action.ItemTags end))) do add(tag, nil) end
+            end
+        end
         table.sort(list, function(a, b) return a.label:lower() < b.label:lower() end)
         result[category.label] = list
         total = total + #list
     end
     if total == 0 then return nil end
     catalog = result
-    Log.Info(string.format("give item: %d consumables, %d materials, %d instant items",
-        #result.Consumables, #result.Materials, #result.Instant))
+    local counts = {}
+    for _, category in ipairs(Give.CATEGORIES) do counts[#counts + 1] = #result[category.label] .. " " .. category.label:lower() end
+    Log.Info("give item: " .. table.concat(counts, ", "))
     return catalog
+end
+
+-- A give is checked again a moment later: the game may refuse items silently (an item at its carry
+-- limit), and the count it reports can lag behind. The status says what really changed.
+local VERIFY_AFTER = 1
+local pendingGive = nil   -- { entry, amount, countBefore, checkAt }
+
+local function reportGive(give)
+    local countAfter = Game.ItemCount(give.entry.tag)
+    local before, label = give.countBefore, give.entry.label
+    Log.Info(string.format("give item %s x%d: count %s -> %s", give.entry.tag, give.amount, tostring(before), tostring(countAfter)))
+    if not (before and countAfter) then
+        App.status = "Gave " .. give.amount .. "x " .. label
+    elseif countAfter > before then
+        App.status = string.format("%s: %d -> %d", label, before, countAfter)
+    else
+        App.status = string.format("%s: still %d (the game took no more)", label, countAfter)
+    end
 end
 
 function Give.Item(entry, amount)
@@ -130,11 +157,22 @@ function Give.Item(entry, amount)
         return
     end
     local countBefore = Game.ItemCount(entry.tag)
-    local ok = Game.AddItem(entry.tag, amount)
+    if not Game.AddItem(entry.tag, amount) then
+        App.status = "Could not add " .. entry.label
+        Log.Info("give item " .. entry.tag .. " x" .. amount .. ": the call failed")
+        return
+    end
     Resources.StartNewCount(entry.tag)
-    Log.Info(string.format("give item %s x%d: %s (count %s -> %s)", entry.tag, amount, ok and "ok" or "failed",
-        tostring(countBefore), tostring(Game.ItemCount(entry.tag))))
-    App.status = ok and ("Added " .. amount .. "x " .. entry.label) or ("Could not add " .. entry.label)
+    pendingGive = { entry = entry, amount = amount, countBefore = countBefore, checkAt = os.clock() + VERIFY_AFTER }
+    App.status = "Giving " .. amount .. "x " .. entry.label .. "..."
+end
+
+function Give.Tick()
+    if pendingGive and os.clock() >= pendingGive.checkAt then
+        local give = pendingGive
+        pendingGive = nil
+        reportGive(give)
+    end
 end
 
 -- ---------------------------------------------------------------------------

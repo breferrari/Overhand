@@ -14,7 +14,10 @@ local SavedValues = {}
 -- Attribute -> the set it lives in, and whether its cheat is on right now.
 local LEDGER_ATTRIBUTES = {
     MaxHealth = { set = "Health", cheatOn = function() return (App.settings.maxHealthFactor or 1) ~= 1 end },
-    ParryWindowAdjustment = { set = "Melee", cheatOn = function() return App.settings.perfectParry == true end },
+    ParryWindowAdjustment = { set = "Melee", cheatOn = function() return App.settings.perfectParry or App.settings.claymoreParry end },
+    StaminaMeleeCostMultiplier = { set = "Stamina", cheatOn = function() return (App.settings.staminaCost or 1) ~= 1 end },
+    StaminaDodgeCostMultiplier = { set = "Stamina", cheatOn = function() return (App.settings.staminaCost or 1) ~= 1 end },
+    StaminaBlockCostMultiplier = { set = "Stamina", cheatOn = function() return (App.settings.staminaCost or 1) ~= 1 end },
 }
 
 local function defaultBaseValue(className, attributeName)
