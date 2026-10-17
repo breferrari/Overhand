@@ -7,7 +7,7 @@
   - toggles as OFF | ON (ON lit in the accent), choices as ‹ value ›; vanilla values read quieter than changed ones; every row changed from vanilla has a red mark
   - sub-rows ("only out of combat", the regeneration options) drawn under their parent with a connector
   - a description of the selected row; every Valor Mortis row has one
-  - footer: what just changed ("Damage Taken: 50%"), how many settings differ from vanilla, and only the buttons that do something on the selected row ("A turn off", "D-pad change"); face buttons drawn as coloured discs
+  - footer: the result of the last action (value changes show on their row; a confirm prompt shows in the description, in red), how many cheats are active, and only the buttons that do something on the selected row ("A turn off", "D-pad change"); face buttons drawn as coloured discs
   - the frame has brass corner ticks; only what changed is redrawn, as before
 - **Themes per game:** `games/<game>/theme.lua` (palette by role in sRGB hex, subtitle, mark, optional display font), passed with `Menu.Configure({ theme = ... })`. Valor Mortis: soot, parchment, crimson, brass.
 - **Mark:** `assets/mark.png` is installed with the mod and loaded with the engine's `ImportFileAsTexture2D`; if that fails the menu draws a small diamond. The log says which (`menu mark:`).

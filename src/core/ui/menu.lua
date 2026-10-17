@@ -7,8 +7,8 @@
 --                actions, section titles, sub-rows; a mark on every row changed from vanilla, the
 --                selected row lit with an edge bar
 --   description  what the selected row does
---   footer       the status line, how many cheats are active, and the buttons that do something on
---                the selected row
+--   footer       the status line (results of actions; value changes show on their row), how many
+--                cheats are active, and the buttons that do something on the selected row
 --
 --   Keyboard: F5 / Esc open / close, Up / Down select, Left / Right change, Enter use, Q / E tabs
 --   Controller (core/ui/input.lua): L3 + R3 open / close, D-pad, A use, B close, LB / RB tabs
@@ -44,7 +44,7 @@ local ROW_PADDING = 8
 local SELECTION_BAR_WIDTH = 3
 local CONTROL_WIDTH = 124      -- toggles and choices line up on the right
 local VALUE_WIDTH = 88         -- a choice's value between its arrows
-local LIST_VALUE_WIDTH = 200   -- a list's value (item names are long); fixed, so nothing moves
+local LIST_VALUE_MAX_WIDTH = 200   -- a list's value (item names are long) is cut off past this
 local LIST_ROWS = 7            -- options shown at once in an open dropdown
 local MARK_SIZE = 26
 local ARROW_WIDTH, ARROW_HEIGHT = 5, 7
@@ -257,17 +257,13 @@ local function moveSelection(direction)
     view.selectedByTab[view.tabIndex] = selectable[(position - 1 + direction) % #selectable + 1]
 end
 
-local function pickOption(item, option)
-    item.set(option.value)
-    App.status = item.label .. ": " .. option.label
-end
+local function pickOption(item, option) item.set(option.value) end
 
 local function changeValue(direction)
     local item = selected()
     if not item then return end
     if item.kind == "toggle" then
         item.set(not item.get())
-        App.status = item.label .. ": " .. (item.get() and "on" or "off")
     elseif item.kind == "choice" then
         local options = optionsOf(item)
         if #options == 0 then return end
@@ -307,6 +303,7 @@ local function activate()
     if item.kind == "choice" and item.list then
         openList(item)
         moveInList(0)   -- clamps the first visible option to the list
+        Log.Limited("menu list", 5, "menu: list " .. item.label .. " opened (" .. #optionsOf(item) .. " options)")
         return
     end
     if item.kind ~= "action" then return end
@@ -316,7 +313,6 @@ local function activate()
     end
     if item.confirmPrompt and view.pendingConfirm ~= item then
         view.pendingConfirm = item
-        App.status = item.confirmPrompt .. (view.withController and " Press A again to confirm." or " Press Enter again to confirm.")
         return
     end
     view.pendingConfirm = nil
@@ -362,11 +358,11 @@ local function buildArrow(tree, name, image, fallback)
         or Widgets.Text(tree, name, fallback, FONT_SIZE.arrow, COLORS.faint)
 end
 
--- ◂ value ▸ (a list's value has a fixed width: long names are cut off, nothing moves).
+-- ◂ value ▸ (a list's long names are cut off).
 local function buildChoice(tree, name, item)
     local line = Widgets.HorizontalBox(tree, name .. "Choice")
-    local valueBox = item.list and Widgets.SizeBox(tree, name .. "ValueBox", LIST_VALUE_WIDTH)
-        or Widgets.SizeBox(tree, name .. "ValueBox", nil, nil, VALUE_WIDTH)
+    local valueBox = Widgets.SizeBox(tree, name .. "ValueBox", nil, nil, VALUE_WIDTH)
+    if item.list then try(function() valueBox:SetMaxDesiredWidth(LIST_VALUE_MAX_WIDTH) end) end
     local value = Widgets.Text(tree, name .. "Value", "", FONT_SIZE.row, COLORS.title, { center = true, ellipsis = item.list })
     valueBox:SetContent(value)
     addCentered(line, buildArrow(tree, name .. "Left", "arrowLeft", "‹"))
@@ -812,12 +808,18 @@ local function drawTabCounts()
     end
 end
 
+-- What the selected row does; while an action waits for its second press, what it will do and how
+-- to confirm (in the accent colour).
 local function drawDescription(item)
     local description, shown = view.widgets.description, view.shown
     setVisible(shown, "descriptionVisible", description.box, item ~= nil)
     if not item then return end
     setText(shown, "descriptionTitle", description.title, item.upperLabel)
-    setText(shown, "descriptionBody", description.body, item.description or "")
+    local confirming = view.pendingConfirm == item
+    local body = confirming and (item.confirmPrompt .. (view.withController and " Press A again to confirm." or " Press Enter again to confirm."))
+        or item.description or ""
+    setText(shown, "descriptionBody", description.body, body)
+    setTextColor(shown, "descriptionColor", description.body, confirming and COLORS.accent or COLORS.label)
 end
 
 -- What each verb hint says for this row (or the open dropdown); nil hides it.
