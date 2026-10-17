@@ -292,7 +292,10 @@ function Widgets.Diamond(tree, name, size, color)
     return box, square
 end
 
--- A key or shoulder button drawn as an outlined cap with its label.
+-- Arrow keys are drawn as an arrow (the menu's arrow image, turned) instead of a word.
+local ARROW_KEYS = { Left = { "arrowLeft", 0 }, Right = { "arrowRight", 0 }, Up = { "arrowRight", -90 }, Down = { "arrowRight", 90 } }
+
+-- A key or shoulder button drawn as an outlined cap with its label (or arrow).
 function Widgets.KeyChip(tree, name, label)
     local colors = Widgets.COLORS
     local edge = Widgets.Border(tree, name .. "Edge", colors.chipEdge, { 1, 1, 1, 1 })
@@ -300,7 +303,15 @@ function Widgets.KeyChip(tree, name, label)
     Widgets.Round(edge, 3)
     Widgets.Round(face, 2)
     edge:SetContent(face)
-    face:SetContent(Widgets.Text(tree, name .. "Label", label, 9, colors.chipText))
+    local arrow = ARROW_KEYS[label]
+    local arrowIcon = arrow and Widgets.Icon(tree, name .. "Arrow", Widgets.images[arrow[1]], 5, 7, colors.chipText)
+    if arrowIcon then
+        try(function() arrowIcon:SetRenderTransformAngle(arrow[2]) end)
+        Widgets.Pad(face, 6, 4, 6, 4)
+        face:SetContent(arrowIcon)
+    else
+        face:SetContent(Widgets.Text(tree, name .. "Label", label, 9, colors.chipText))
+    end
     return edge
 end
 

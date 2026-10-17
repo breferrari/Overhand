@@ -17,7 +17,7 @@ Fixes:
 - **The first open of a dropdown showed nothing** (it opened, but a widget built hidden is drawn with no size the first time): the dropdowns get one layout pass at build.
 - **Give Item** checks the count a second later and says what changed ("Sharp Coating: 3 -> 8", or "you carry the most (3); the rest went to storage") instead of a blind "Added".
 - **Lists** (Item, Quest): the row shows its value with a ▾; pressing opens the list in the description panel (6 at a time, with a scroll indicator and a "12 / 34" position), so it never pushes the rows or goes off screen. Left / right no longer step them.
-- **Long tabs scroll**: the rows area has a maximum height and follows the selection (and the dropdown's highlight), so the menu fits the screen.
+- **Fits the screen**: the menu is drawn at the design's size (scale 1.0); the rows area has a maximum height, scrolls to keep the selected row in view and shows a scroll indicator when a tab is taller. The keyboard's keys go on a second footer line (arrow keys drawn as arrows), and the status line is clipped instead of running under them.
 - **Amount** counts 1, 2, 3, ... (hold to speed up: steps of 10, then 100) instead of jumping 1, 5, 10, 25.
 
 ## 1.5.0 (2026-10-17): its own look

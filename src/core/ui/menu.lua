@@ -37,7 +37,7 @@ local addCentered = Widgets.AddCentered
 
 -- Sizes are the design's pixels at 1080p; font sizes are points (3/4 of the design's pixels).
 -- MENU_SCALE enlarges the whole menu evenly.
-local MENU_SCALE = 1.1
+local MENU_SCALE = 1.0
 local WIDTH = 480
 local SIDE_PADDING = 22
 local ROW_PADDING = 8
@@ -48,7 +48,8 @@ local LIST_VALUE_MAX_WIDTH = 200   -- a list's value (item names are long) is cu
 local LIST_ROWS = 6            -- options shown at once in an open list (in the description panel)
 local LIST_LINE_HEIGHT = 26
 local LIST_TRACK_WIDTH = 2     -- the list's scroll indicator
-local PAGE_MAX_HEIGHT = 520    -- the rows area scrolls past this (the menu, list open, fits 1080p)
+local PAGE_MAX_HEIGHT = 600    -- the rows area scrolls past this (the menu, list open, fits 1080p)
+local SCROLL_MARGIN = 12       -- room kept around the selected row when scrolling to it
 local MARK_SIZE = 26
 local ARROW_WIDTH, ARROW_HEIGHT = 5, 7
 local CORNER_LENGTH, CORNER_THICKNESS = 12, 2
@@ -64,14 +65,13 @@ local FONT_SIZE = {
     toggle = 8.5, arrow = 9, info = 9, descriptionTitle = 8.5, description = 10.5, footer = 9, hint = 9,
 }
 
--- The footer's buttons for each input device. A hint with a verb is only shown when the selected
+-- The footer's buttons for each input device (the keyboard's go on a line of their own). A hint with a verb is only shown when the selected
 -- row (or the open list) has something for it, and says what: "press" (toggle, use, open a
 -- list, pick), "change" (step a choice), "back" (close the menu, or the list).
 local HINTS = {
     keyboard = {
         { keys = { "Enter" }, verb = "press" },
         { keys = { "Left", "Right" }, verb = "change" },
-        { keys = { "Up", "Down" }, label = "select" },
         { keys = { "Q", "E" }, label = "tab" },
         { keys = { "F5" }, label = "close" },
     },
@@ -561,6 +561,17 @@ local function buildHeader(tree, column)
     return tabWidgets, title
 end
 
+-- A scroll indicator: a thumb on a track, height high. Hidden until something scrolls.
+local function buildScrollTrack(tree, name, height)
+    local track = Widgets.Overlay(tree, name)
+    Widgets.Align(track:AddChild((Widgets.Bar(tree, name .. "Line", COLORS.edge, LIST_TRACK_WIDTH, height))), FILL, START)
+    local thumbBox = Widgets.Bar(tree, name .. "Thumb", COLORS.highlight, LIST_TRACK_WIDTH, height)
+    local thumbSlot = track:AddChild(thumbBox)
+    Widgets.Align(thumbSlot, FILL, START)
+    Widgets.SetVisible(track, false)
+    return { box = track, thumbBox = thumbBox, thumbSlot = thumbSlot, height = height, shown = {} }
+end
+
 -- An open list: LIST_ROWS lines (a mark on the current option, the highlighted one lit) and a scroll
 -- indicator, a thumb on a track, sized and placed by the part of the list in view.
 local function buildPicker(tree)
@@ -580,13 +591,9 @@ local function buildPicker(tree)
         lines[index] = { box = lineBox, border = border, bar = bar, marker = marker, text = text, shown = {} }
     end
     Widgets.Fill(box:AddChild(stack))
-    local track = Widgets.Overlay(tree, "PickerTrack")
-    Widgets.Align(track:AddChild((Widgets.Bar(tree, "PickerTrackLine", COLORS.edge, LIST_TRACK_WIDTH, LIST_ROWS * LIST_LINE_HEIGHT))), FILL, START)
-    local thumbBox, thumb = Widgets.Bar(tree, "PickerThumb", COLORS.highlight, LIST_TRACK_WIDTH, LIST_LINE_HEIGHT)
-    local thumbSlot = track:AddChild(thumbBox)
-    Widgets.Align(thumbSlot, FILL, START)
-    Widgets.Pad(box:AddChild(track), 8, 0, 0, 0)
-    return { box = box, lines = lines, track = track, thumbBox = thumbBox, thumbSlot = thumbSlot, thumb = thumb, shown = {} }
+    local track = buildScrollTrack(tree, "PickerTrack", LIST_ROWS * LIST_LINE_HEIGHT)
+    Widgets.Pad(box:AddChild(track.box), 8, 0, 0, 0)
+    return { box = box, lines = lines, track = track }
 end
 
 -- The selected row's name and what it does, or (a list open) the list.
@@ -638,12 +645,12 @@ local function buildHintRow(tree, line, device)
     return { box = row, hints = hints }
 end
 
--- Status · N active on the left (the status is cut off when long), the buttons on the right.
+-- Status · N active on the left (the status is cut off when long), the controller's buttons on the
+-- right; the keyboard's on a second line (they do not fit next to the status).
 local function buildFooter(tree, column)
     column:AddChild((Widgets.Bar(tree, "FooterLine", COLORS.edge, nil, 1)))
     local footer = Widgets.Border(tree, "Footer", COLORS.footer, { SIDE_PADDING, 10, SIDE_PADDING, 10 })
     local line = Widgets.HorizontalBox(tree, "FooterRow")
-    footer:SetContent(line)
     local statusLine = Widgets.HorizontalBox(tree, "StatusLine")
     local status = Widgets.Text(tree, "Status", "", FONT_SIZE.footer, COLORS.highlight, { ellipsis = true })
     local separator = Widgets.Text(tree, "StatusSeparator", "·", FONT_SIZE.footer, COLORS.edge)
@@ -655,9 +662,17 @@ local function buildFooter(tree, column)
     addCentered(statusLine, separator, 8, 8)
     addCentered(statusLine, count)
     Widgets.Fill(addCentered(line, statusLine))
-    local hintRows = { keyboard = buildHintRow(tree, line, "keyboard"), controller = buildHintRow(tree, line, "controller") }
+    try(function() statusLine:SetClipping(1) end)   -- EWidgetClipping::ClipToBounds: never under the buttons
+    local keyboardLine = Widgets.HorizontalBox(tree, "FooterKeyboardLine")
+    local stack = Widgets.VerticalBox(tree, "FooterStack")
+    stack:AddChild(line)
+    local keyboardSlot = stack:AddChild(keyboardLine)
+    Widgets.Align(keyboardSlot, END, nil)
+    Widgets.Pad(keyboardSlot, 0, 6, 0, 0)
+    footer:SetContent(stack)
+    local hintRows = { keyboard = buildHintRow(tree, keyboardLine, "keyboard"), controller = buildHintRow(tree, line, "controller") }
     column:AddChild(footer)
-    return { status = status, separator = separator, count = count, hintRows = hintRows }
+    return { status = status, separator = separator, count = count, hintRows = hintRows, keyboardLine = keyboardLine }
 end
 
 -- Short brass ticks over the frame's corners.
@@ -723,7 +738,11 @@ local function build(controller)
     local scrollLimit = Widgets.SizeBox(tree, "PagesLimit")
     try(function() scrollLimit:SetMaxDesiredHeight(PAGE_MAX_HEIGHT) end)
     scrollLimit:SetContent(scroll)
-    column:AddChild(scrollLimit)
+    local pagesLine = Widgets.HorizontalBox(tree, "PagesLine")
+    Widgets.Fill(pagesLine:AddChild(scrollLimit))
+    local scrollTrack = buildScrollTrack(tree, "PagesTrack", PAGE_MAX_HEIGHT - 24)
+    Widgets.Pad(pagesLine:AddChild(scrollTrack.box), 0, 12, 8, 12)
+    column:AddChild(pagesLine)
     for index, tab in ipairs(tabs) do pages[index] = buildPage(tree, pagesBox, index, tab) end
     local description = buildDescription(tree, column)
     local footer = buildFooter(tree, column)
@@ -740,7 +759,7 @@ local function build(controller)
         return build(controller)
     end
     view.widgets = {
-        root = root, frame = frame, frameSlot = frameSlot, tabs = tabWidgets, pages = pages, scroll = scroll,
+        root = root, frame = frame, frameSlot = frameSlot, tabs = tabWidgets, pages = pages, scroll = scroll, scrollTrack = scrollTrack,
         description = description, footer = footer,
     }
     view.shownTabIndex = nil
@@ -781,6 +800,17 @@ end
 
 local function setVisible(state, key, widget, visible)
     if changed(state, key, visible) then Widgets.SetVisible(widget, visible) end
+end
+
+-- Shows the part in view: visible of total, starting at first (any unit). Hidden when all fits.
+local function drawScrollTrack(track, first, visible, total)
+    local scrolls = total > visible + 0.5
+    setVisible(track.shown, "visible", track.box, scrolls)
+    if not scrolls then return end
+    local thumbHeight = math.max(10, math.floor(track.height * visible / total))
+    local thumbTop = math.floor((track.height - thumbHeight) * first / math.max(total - visible, 1))
+    if changed(track.shown, "thumbHeight", thumbHeight) then try(function() track.thumbBox:SetHeightOverride(thumbHeight) end) end
+    if changed(track.shown, "thumbTop", thumbTop) then Widgets.Pad(track.thumbSlot, 0, thumbTop, 0, 0) end
 end
 
 -- A selectable line lit (selected) or not: its background and edge bar.
@@ -832,16 +862,7 @@ local function drawPicker(picker, list)
             end
         end
     end
-    local count = math.max(#options, 1)
-    local trackHeight = LIST_ROWS * LIST_LINE_HEIGHT
-    local scrolls = #options > LIST_ROWS
-    setVisible(picker.shown, "trackVisible", picker.track, scrolls)
-    if scrolls then
-        local thumbHeight = math.max(10, math.floor(trackHeight * LIST_ROWS / count))
-        local thumbTop = math.floor((trackHeight - thumbHeight) * (list.first - 1) / math.max(count - LIST_ROWS, 1))
-        if changed(picker.shown, "thumbHeight", thumbHeight) then try(function() picker.thumbBox:SetHeightOverride(thumbHeight) end) end
-        if changed(picker.shown, "thumbTop", thumbTop) then Widgets.Pad(picker.thumbSlot, 0, thumbTop, 0, 0) end
-    end
+    drawScrollTrack(picker.track, list.first - 1, LIST_ROWS, #options)
     return #options > 0 and (list.highlighted .. " / " .. #options) or ""
 end
 
@@ -965,7 +986,8 @@ local function keepInView(page, selectedIndex)
     if not rowWidgets then return end
     local target = rowWidgets.border
     if changed(view.shown, "scrollTarget", target) then
-        try(function() view.widgets.scroll:ScrollWidgetIntoView(target, false) end)
+        -- (widget, animate, EDescendantScrollDestination::IntoView, padding)
+        try(function() view.widgets.scroll:ScrollWidgetIntoView(target, false, 0, SCROLL_MARGIN) end)
     end
 end
 
@@ -984,6 +1006,9 @@ local function refresh()
         end
     end
     keepInView(page, selectedIndex)
+    local scrollOffset = Unreal.TryNumber(function() return widgets.scroll:GetScrollOffset() end)
+    local scrollEnd = Unreal.TryNumber(function() return widgets.scroll:GetScrollOffsetOfEnd() end)
+    if scrollOffset and scrollEnd then drawScrollTrack(widgets.scrollTrack, scrollOffset, PAGE_MAX_HEIGHT, PAGE_MAX_HEIGHT + scrollEnd) end
     drawTabCounts()
     drawDescription(selectedItem)
     drawFooter(selectedItem)
@@ -1014,6 +1039,7 @@ local function open(withController)
     local hintRows = view.widgets.footer.hintRows
     Widgets.SetVisible(view.widgets.root, true)
     Widgets.SetVisible(hintRows.keyboard.box, not view.withController)
+    Widgets.SetVisible(view.widgets.footer.keyboardLine, not view.withController)
     Widgets.SetVisible(hintRows.controller.box, view.withController)
     applyScale(controller)
     Input.BlockGame(view.withController)
