@@ -67,7 +67,7 @@ Scripts\gas\        src\gas\           (only for games that use GAS)
 Scripts\game\       games\<game>\      (only that game)
 ```
 
-Your `settings.cfg` and teleports are kept across installs. The game's `manifest.json` lists other mods Overhand replaces (they are switched off, not deleted) and earlier folder names to take settings from.
+A game update or a Game Pass / Steam "repair" can remove UE4SS and the mod; install again afterwards. Your `settings.cfg` and teleports are kept across installs. The game's `manifest.json` lists other mods Overhand replaces (they are switched off, not deleted) and earlier folder names to take settings from.
 
 ## Files it writes
 
