@@ -6,13 +6,13 @@
 
 One menu with every cheat, inside the game, built on [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS). Press **F5**, or click **both sticks** on a controller, pick a tab and change a value.
 
-- **A clean off switch.** Turn a cheat off and the game is exactly as it was before. Nothing runs that you didn't switch on.
-- **Controller first, keyboard too.** Full menu control from a gamepad; the footer shows only the buttons that do something on the selected row, for the device you opened it with.
-- **Explains itself.** Every row says what it does; the rows you've changed carry a red mark, and each tab counts them.
-- **Remembers you.** Your choices are saved for the next session.
-- **Light on the game.** Closed, it does next to nothing, and a cheat that's off costs nothing ([details](docs/PERFORMANCE.md)).
-- **Safe by default.** One-way actions ask twice; the menu stays out of the way of the game's own menus.
-- **Each game looks like itself.** Every game brings its own theme: palette, mark and fonts.
+- Every cheat can be turned off at any time, and turning it off puts the game back as it was.
+- Works with a controller or a keyboard. The footer shows only the buttons that do something on the selected row.
+- Every row has a description. Rows you've changed are marked, and each tab shows how many.
+- Your settings are saved between sessions.
+- Actions that can't be undone need a second press.
+- Closed, the menu does almost nothing, and a cheat that's off costs nothing ([details](docs/PERFORMANCE.md)).
+- Each game has its own theme.
 
 <br clear="right">
 
@@ -22,7 +22,7 @@ One menu with every cheat, inside the game, built on [UE4SS](https://github.com/
 |---|---|---|
 | [**Valor Mortis**](docs/games/valormortis.md) | UE 5.7 | Survival, movement, teleport, combat, items, give, quests: [see them all](docs/games/valormortis.md#cheats) |
 
-Want another game? [Adding a game](docs/PORTING.md) walks through it.
+To add a game, see [Adding a game](docs/PORTING.md).
 
 ## Quick start
 
@@ -33,7 +33,7 @@ Want another game? [Adding a game](docs/PORTING.md) walks through it.
    .\tools\install.ps1 -Game valormortis
    ```
    The installer finds the game in your Steam libraries, Xbox app / Game Pass folders (any drive), Epic Games and GOG installs.
-4. **Play.** Load a save and press **F5** (or **L3 + R3**).
+4. Load a save and press **F5** (or **L3 + R3**).
 
 <details>
 <summary><b>More install options</b></summary>
