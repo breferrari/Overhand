@@ -203,7 +203,8 @@ end
 
 Unreal.OnWorldReset(function()
     deathmarkRetryAt = {}
-    consumables.lastCounts, consumables.unrefillable, consumables.verifyNextPoll = {}, {}, {}
+    -- peak counts too: after loading another save, Refill must not top it up to this one's counts
+    consumables.lastCounts, consumables.unrefillable, consumables.verifyNextPoll, consumables.peakCounts = {}, {}, {}, {}
 end)
 
 return Resources

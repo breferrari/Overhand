@@ -148,10 +148,10 @@ function Movement.Tick()
 end
 
 Unreal.OnWorldReset(function()
-    speedOverride:forget()
-    jumpOverride:forget()
-    accelerationOverride:forget()
-    flyOverride:forget()
+    speedOverride:release()
+    jumpOverride:release()
+    accelerationOverride:release()
+    flyOverride:release()
     appliedGameSpeed = 1
     State.noClipActive = false
 end)

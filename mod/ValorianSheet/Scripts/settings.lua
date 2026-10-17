@@ -91,7 +91,9 @@ end
 -- Reading
 -- ---------------------------------------------------------------------------
 
+-- Returns the raw key -> text pairs it read (for migrations).
 local function loadSettings(content)
+    local raw = {}
     for line in content:gmatch("[^\r\n]+") do
         local key, text = line:match("^%s*([%w%.]+)%s*=%s*(.-)%s*$")
         if key and key:find("^ledger%.") then
@@ -100,9 +102,11 @@ local function loadSettings(content)
                 State.attributeLedger[key:sub(#"ledger." + 1)] = { vanilla = tonumber(vanilla), written = tonumber(written) }
             end
         elseif key then
+            raw[key] = text
             applySetting(key, text)
         end
     end
+    return raw
 end
 
 local function loadTeleports(content)
@@ -172,10 +176,23 @@ local function importPassiveHealthRegen()
     Log.Info("imported settings from Passive Health Regen")
 end
 
+-- settings.cfg from 1.0.0 (regeneration was a share of max health, "regenRate"): take Passive
+-- Health Regen's settings if it is installed (the 1.1.0 install switched it off), otherwise turn an
+-- enabled old regeneration into its default of 5 health per second.
+local function migrateFrom100(raw)
+    if raw.regenPerSecond then return end
+    importPassiveHealthRegen()
+    if State.settings.regenPerSecond == 0 and (tonumber(raw.regenRate) or 0) > 0 then
+        State.settings.regenPerSecond = 5
+    end
+    Log.Info("settings: migrated Health Regeneration from 1.0.0")
+    Settings.MarkDirty()
+end
+
 function Settings.Load()
     local settings = Paths.ReadFile(SETTINGS_FILE)
     if settings then
-        loadSettings(settings)
+        migrateFrom100(loadSettings(settings))
         loadTeleports(Paths.ReadFile(TELEPORTS_FILE) or "")
         return
     end

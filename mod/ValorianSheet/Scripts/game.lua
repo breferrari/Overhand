@@ -312,6 +312,9 @@ local classNameByDefinition = {}   -- definition address -> class name (resolvin
 
 function Game.BeginTick() tickNumber = tickNumber + 1 end
 
+-- After removing an effect: the shared list no longer matches the array, read it again.
+function Game.InvalidateActiveEffects() effectSnapshot.tick = -1 end
+
 function Game.ActiveEffects()
     if effectSnapshot.tick == tickNumber then return effectSnapshot.entries end
     local entries = {}

@@ -62,12 +62,13 @@ local function withTraceback(err) return debug.traceback(tostring(err), 2) end
 
 -- Runs fn; an error is logged with its stack trace instead of raised. The same context logs at most
 -- one error every few seconds, so a failure on a per-tick path does not flood the log.
+-- Returns true and fn's first result, or false.
 function Log.Guarded(context, fn, ...)
-    local ok, err = xpcall(fn, withTraceback, ...)
-    if ok then return true end
+    local ok, result = xpcall(fn, withTraceback, ...)
+    if ok then return true, result end
     if os.clock() >= (lastErrorAt[context] or -math.huge) + ERROR_REPEAT_SECONDS then
         lastErrorAt[context] = os.clock()
-        Log.Info("ERROR in " .. context .. ": " .. tostring(err))
+        Log.Info("ERROR in " .. context .. ": " .. tostring(result))
     end
     return false
 end

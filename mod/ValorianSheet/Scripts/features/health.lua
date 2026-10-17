@@ -169,7 +169,11 @@ local REGEN_STEP_SECONDS = 0.25
 local ADD_HEALTH_EFFECT = "/Game/Minotaur/Gameplay/GAS/GameplayEffects/GE_AddHealth.Default__GE_AddHealth_C"
 local COMPANION_LIBRARY = "/Script/GASCompanion.Default__GSCBlueprintFunctionLibrary"
 
-local regen = { lastHealth = nil, lastHitAt = -math.huge, lastStepAt = nil, healthAttribute = nil, nextAttributeSearchAt = 0, logged = false }
+local regen = {
+    lastHealth = nil, lastHitAt = -math.huge, lastStepAt = nil,
+    healthAttribute = nil, nextAttributeSearchAt = 0,
+    method = nil,   -- "attributes" / "direct": decided by the first step that healed, logged once
+}
 
 -- The FGameplayAttribute for Health, taken from GE_AddHealth's modifiers (looked up every 5 s until found).
 local function healthAttribute()
@@ -229,15 +233,25 @@ local function regenerateHealth()
     regen.lastStepAt = now
 
     local amount = math.min(perSecond * math.min(elapsed, 1), missing)
-    if not addHealthThroughAttributeSystem(healthSet, amount) then
-        Game.SetAttribute(healthSet, "Health", health + amount)
-        Hud.UpdateHealthBar(health + amount, maxHealth)
+    if regen.method ~= "direct" and addHealthThroughAttributeSystem(healthSet, amount) then
+        local healthAfter = Game.GetAttribute(healthSet, "Health")
+        if healthAfter and healthAfter >= health + amount * 0.5 then
+            regen.lastHealth = healthAfter
+            if regen.method ~= "attributes" then
+                regen.method = "attributes"
+                Log.Info(string.format("health regeneration: %s health per second, through the attribute system", tostring(perSecond)))
+            end
+            return
+        end
     end
+    -- the attribute path is missing or did not raise health: write it directly from now on
+    if regen.method ~= "direct" then
+        regen.method = "direct"
+        Log.Info(string.format("health regeneration: %s health per second, written directly", tostring(perSecond)))
+    end
+    Game.SetAttribute(healthSet, "Health", health + amount)
+    Hud.UpdateHealthBar(health + amount, maxHealth)
     regen.lastHealth = Game.GetAttribute(healthSet, "Health") or health + amount
-    if not regen.logged then
-        regen.logged = true
-        Log.Info(string.format("health regeneration: %s health per second", tostring(perSecond)))
-    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -255,13 +269,13 @@ function Health.Tick()
     end
     Log.Guarded("fall damage", applyFallDamageCurve)
     Log.Guarded("health regeneration", regenerateHealth)
-    Damage.Tick()
-    applyMaxHealthAndDamageTaken()
+    Log.Guarded("damage hooks", Damage.Tick)
+    Log.Guarded("max health and damage taken", applyMaxHealthAndDamageTaken)
     Log.Guarded("health bar length", Hud.KeepHealthBarLength) -- after Max Health was applied this tick
 end
 
 Unreal.OnWorldReset(function()
-    maxHealthOverride:forget()
+    maxHealthOverride:release()
     State.appliedMaxHealthFactor = 1
     lastHealth = nil
     regen.lastHealth, regen.lastStepAt = nil, nil

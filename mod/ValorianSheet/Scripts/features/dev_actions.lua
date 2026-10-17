@@ -54,10 +54,12 @@ end
 local abilityCostsIgnored = false
 local lastToggleAt = -math.huge
 
+-- Without the cheat manager (UE4SS's CheatManagerEnablerMod off) it waits quietly and tries again.
 function DevActions.Tick()
     local wanted = State.settings.noAbilityCosts == true
     if abilityCostsIgnored == wanted or os.clock() - lastToggleAt < 1.5 then return end
     lastToggleAt = os.clock()
+    if not Game.CheatManager() then return end
     if Game.CallDevCheat("IgnoreCostsToggle") then
         abilityCostsIgnored = wanted
         Log.Debug("AbilitySystem.IgnoreCosts now reads " .. tostring(Game.ReadConsoleBool("AbilitySystem.IgnoreCosts")))

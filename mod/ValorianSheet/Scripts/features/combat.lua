@@ -19,13 +19,18 @@ local try, isValid = Unreal.Try, Unreal.IsValid
 
 local combatState = { checkedAt = -math.huge, inCombat = false }
 
+local searchWorldAddress = nil   -- the world being matched by the search below
+
+local function belongsToSearchWorld(subsystem)
+    local outer = try(function() return subsystem:GetOuter() end)
+    return searchWorldAddress ~= nil and Unreal.AddressOf(outer) == searchWorldAddress
+end
+
 local function enemyInfoOfThisWorld()
-    local world = Game.World()
-    local worldAddress = world and Unreal.AddressOf(world)
-    return Unreal.FindCached("enemyInfo", "EnemyInfoSubsystem", 5, function(subsystem)
-        local outer = try(function() return subsystem:GetOuter() end)
-        return worldAddress ~= nil and Unreal.AddressOf(outer) == worldAddress
-    end)
+    local cached = Unreal.GetCached("enemyInfo")
+    if cached then return cached end
+    searchWorldAddress = Unreal.AddressOf(Game.World())
+    return Unreal.FindCached("enemyInfo", "EnemyInfoSubsystem", 5, belongsToSearchWorld)
 end
 
 function Combat.IsInCombat()
@@ -164,6 +169,7 @@ local function applyDodgeWindow()
                 handled.removed = true
                 local effectClass = try(function() return invincibility.definition:GetClass() end)
                 try(function() abilitySystem:RemoveActiveGameplayEffectBySourceEffect(effectClass, nil, -1) end)
+                Game.InvalidateActiveEffects()
             else
                 dodges.removalPending = true
             end
@@ -212,7 +218,7 @@ function Combat.Tick()
 end
 
 Unreal.OnWorldReset(function()
-    perfectParryOverride:forget()
+    perfectParryOverride:release()
     dodges.handled, dodges.lastEffectCount, dodges.removalPending = {}, -1, false
     combatState.checkedAt = -math.huge
 end)

@@ -40,20 +40,23 @@ local function ownedByPlayer(widget)
     return Game.IsPlayer(pawn)
 end
 
--- The HUD widget that belongs to the current William.
+local VITALS_CLASS = "WBP_PlayerVitals_C"
+local function isOwnedByPlayer(widget) return ownedByPlayer(widget) == true end
+local function hasUnknownOwner(widget) return ownedByPlayer(widget) == nil end
+
+-- The HUD widget that belongs to the current William. One whose owner is unknown is only a
+-- fallback while none is known to be his (the old HUD after a load also has no owner any more).
 local function vitalsWidget()
-    local widget = Unreal.FindCached("vitals", "WBP_PlayerVitals_C", 2, function(candidate)
-        return ownedByPlayer(candidate) ~= false
-    end)
-    if widget and os.clock() >= nextOwnerCheckAt then
+    local owned = Unreal.FindCached("vitals", VITALS_CLASS, 2, isOwnedByPlayer)
+    if owned and os.clock() >= nextOwnerCheckAt then
         nextOwnerCheckAt = os.clock() + OWNER_CHECK_INTERVAL
-        if ownedByPlayer(widget) == false then
-            Log.Debug("health bar: HUD belongs to an old William, looking for the new one")
+        if not isOwnedByPlayer(owned) then
+            Log.Debug("health bar: HUD no longer belongs to William, looking for his")
             Unreal.Forget("vitals")
-            return nil
+            owned = nil
         end
     end
-    return widget
+    return owned or Unreal.FindCached("vitalsOwnerUnknown", VITALS_CLASS, 2, hasUnknownOwner)
 end
 
 local function healthBarWidget()

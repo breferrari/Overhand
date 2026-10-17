@@ -46,14 +46,18 @@ local function repairDamageMultipliers()
     if repaired > 0 then State.status = "Repaired your damage values (left over from an old cheat menu)" end
 end
 
+-- Returns false while an attribute set in the ledger is not readable yet (try again later).
 local function restoreLedgerValues()
+    local allChecked = true
     for attributeName, recorded in pairs(State.attributeLedger) do
         local known = LEDGER_ATTRIBUTES[attributeName]
         local set = known and Game.AttributeSet(known.set)
         local base = set and Game.GetBaseValue(set, attributeName)
         if not known then
             Override.RecordInLedger(attributeName, nil)
-        elseif base then
+        elseif not base then
+            allChecked = false
+        else
             if not Override.NearlyEqual(base, recorded.written) then
                 Log.Debug(attributeName .. ": saved value " .. base .. " is not ours, ledger entry dropped")
                 Override.RecordInLedger(attributeName, nil)
@@ -75,11 +79,14 @@ local function restoreLedgerValues()
             end
         end
     end
+    return allChecked
 end
 
+-- Returns true once everything could be checked; until then the cheats wait (see cheats.lua), so
+-- Max Health is never applied on top of a value saved last session.
 function SavedValues.Check()
     repairDamageMultipliers()
-    restoreLedgerValues()
+    return restoreLedgerValues()
 end
 
 return SavedValues

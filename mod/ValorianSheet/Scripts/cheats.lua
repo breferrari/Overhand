@@ -19,10 +19,25 @@ local SavedValues = require("features.saved_values")
 
 local Cheats = {}
 
+local SETTLE_SECONDS = 2               -- after William appears, before anything is applied
+local SAVED_VALUES_TIMEOUT = 10        -- the cheats stop waiting for the saved-values check after this
+local SAVED_VALUES_RETRY = 0.5
+
+local FEATURES = {
+    { name = "dev actions", tick = DevActions.Tick },
+    { name = "health", tick = Health.Tick },
+    { name = "resources", tick = Resources.Tick },
+    { name = "movement", tick = Movement.Tick },
+    { name = "combat", tick = Combat.Tick },
+    { name = "buffs", tick = Buffs.Tick },
+}
+
 local session = {
     readyAt = 0,                  -- nothing is applied before then (the world is still loading)
     playerAddress = nil,          -- the William the per-world state belongs to
     savedValuesChecked = false,
+    savedValuesDeadline = 0,
+    nextSavedValuesTryAt = 0,
     brokenWeaponsChecked = false,
 }
 
@@ -30,6 +45,21 @@ Unreal.OnWorldReset(function()
     session.savedValuesChecked = false
     session.brokenWeaponsChecked = false
 end)
+
+-- The saved-values check must run before any feature touches attributes; it is retried until the
+-- attribute sets are readable. Returns true once the features may run.
+local function checkSavedValues()
+    if session.savedValuesChecked then return true end
+    if os.clock() < session.nextSavedValuesTryAt then return false end
+    session.nextSavedValuesTryAt = os.clock() + SAVED_VALUES_RETRY
+    local ok, allChecked = Log.Guarded("check saved values", SavedValues.Check)
+    local done = ok and allChecked == true
+    if done or os.clock() >= session.savedValuesDeadline then
+        if not done then Log.Info("saved values: attribute sets not readable, continuing without the check") end
+        session.savedValuesChecked = true
+    end
+    return session.savedValuesChecked
+end
 
 function Cheats.Tick()
     if os.clock() < session.readyAt then return end
@@ -45,29 +75,21 @@ function Cheats.Tick()
         Log.Info("player found")
         Unreal.ResetWorld()
         session.playerAddress = address
-        session.readyAt = os.clock() + 2
+        session.readyAt = os.clock() + SETTLE_SECONDS
+        session.savedValuesDeadline = session.readyAt + SAVED_VALUES_TIMEOUT
         State.status = "Ready"
         return
     end
 
-    if not session.savedValuesChecked then
-        session.savedValuesChecked = true
-        Log.Guarded("check saved values", SavedValues.Check)
-    end
+    if not checkSavedValues() then return end
     if not session.brokenWeaponsChecked then
         session.brokenWeaponsChecked = Unreal.Try(Give.RemoveBrokenWeapons) == true
     end
-
-    DevActions.Tick()
-    Health.Tick()
-    Resources.Tick()
-    Movement.Tick()
-    Combat.Tick()
-    Buffs.Tick()
+    for _, feature in ipairs(FEATURES) do Log.Guarded(feature.name, feature.tick) end
 end
 
--- A map is loading: wait for it. The new William resets the world state when he appears (his
--- address differs), which is the single place the reset happens.
+-- A map is loading: wait for it. The new William resets the world state when he appears; the same
+-- William after a restart resets it too (overrides hand back their vanilla values, see Override:release).
 function Cheats.OnWorldChange(reason)
     Log.Debug("world change: " .. tostring(reason))
     session.playerAddress = nil

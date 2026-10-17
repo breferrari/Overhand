@@ -155,6 +155,25 @@ def test_import() -> list[str]:
     return problems
 
 
+def test_migration() -> list[str]:
+    """settings.cfg from 1.0.0 (regenRate, no regenPerSecond)."""
+    problems = []
+    for with_passive_regen, expected in ((True, "regenPerSecond=7.5"), (False, "regenPerSecond=5")):
+        with tempfile.TemporaryDirectory() as temp:
+            mod_copy = fresh_mod_copy(temp)
+            (mod_copy / "settings.cfg").write_text("godMode=true\nregenRate=0.02\nregenDelay=2\n", encoding="utf-8")
+            if with_passive_regen:
+                passive_regen = pathlib.Path(temp) / "PassiveHealthRegen"
+                passive_regen.mkdir()
+                (passive_regen / "PassiveHealthRegen.cfg").write_text(PASSIVE_REGEN_CONFIG, encoding="utf-8")
+            problems += run_mod(mod_copy, walk_menu=False)
+            settings = (mod_copy / "settings.cfg").read_text(encoding="utf-8").splitlines()
+        for line in (expected, "godMode=true"):
+            if line not in settings:
+                problems.append(f"migration ({'with' if with_passive_regen else 'without'} Passive Health Regen): expected '{line}'")
+    return problems
+
+
 def test_menu_walk() -> list[str]:
     with tempfile.TemporaryDirectory() as temp:
         return run_mod(fresh_mod_copy(temp))
@@ -166,7 +185,9 @@ def main() -> int:
         print("Compile errors:\n" + "\n".join(errors))
         return 1
     print("compile: ok")
-    for name, test in (("import from other mods", test_import), ("load + ticks + menu", test_menu_walk)):
+    tests = (("import from other mods", test_import), ("migration from 1.0.0", test_migration),
+             ("load + ticks + menu", test_menu_walk))
+    for name, test in tests:
         problems = test()
         if problems:
             print(f"{name}: FAILED\n" + "\n".join(problems))

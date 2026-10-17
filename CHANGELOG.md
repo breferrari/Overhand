@@ -12,6 +12,16 @@
   - shared helpers for the item database, tag names, HUD refreshes, rate-limited log lines, file I/O, `Game.IsPlayer`, `Game.PlayerHealth`, combat-utils hooks
 - **Efficiency:** one shared read of the active effects per tick, Dodge Window reads it only when it changes, the menu only redraws what changed, memoized dynamic lists, early returns for cheats that are off, no closures in the hottest helpers.
 - **Fixes along the way:** teleport slots beyond 5 imported from the Cheat Menu are kept on save; settings write whole numbers without ".0".
+- **Code review fixes:**
+  - A world reset hands back vanilla values on objects that survive it (Override:release), so Movement Speed etc. can no longer compound after a restart.
+  - Refill Everything forgets item peaks with the world (no topping a new save up to another save's counts).
+  - The HUD lookup prefers the widget William owns over one with an unknown owner.
+  - The shared effect list is re-read after Dodge Window removes an effect.
+  - Regeneration checks that health actually rose and otherwise writes it directly.
+  - The cheats wait (up to 10 s) until the saved-values check could read the attribute sets.
+  - Every feature tick runs guarded on its own.
+  - No Ability Costs retries quietly without a cheat manager.
+  - settings.cfg from 1.0.0 migrates Health Regeneration.
 
 ## 1.0.0 (2026-10-17)
 
