@@ -50,6 +50,7 @@ local LIST_LINE_HEIGHT = 26
 local LIST_TRACK_WIDTH = 2     -- the list's scroll indicator
 local PAGE_MAX_HEIGHT = 600    -- the rows area scrolls past this (the menu, list open, fits 1080p)
 local SCROLL_MARGIN = 12       -- room kept around the selected row when scrolling to it
+local PICKER_WARMUP_TICKS = 3  -- the list panel's invisible first paint (see build)
 local MARK_SIZE = 26
 local ARROW_WIDTH, ARROW_HEIGHT = 5, 7
 local CORNER_LENGTH, CORNER_THICKNESS = 12, 2
@@ -748,10 +749,11 @@ local function build(controller)
     local footer = buildFooter(tree, column)
 
     try(function() root:AddToViewport(1000) end)
-    -- A widget that starts hidden is never laid out, and the first time it is shown Slate may draw
-    -- it with no size. So the list gets one layout pass while visible, then is hidden until opened.
-    try(function() root:ForceLayoutPrepass() end)
-    Widgets.SetVisible(description.picker.box, false)
+    -- The list panel is never painted the first time it is shown (tested: the list opened, the log
+    -- said so, but it appeared only on the second open; from then on always). So it is painted once
+    -- right away, invisible (opacity 0), and hidden after PICKER_WARMUP_TICKS.
+    try(function() description.picker.box:SetRenderOpacity(0.0) end)
+    for _, line in ipairs(description.picker.lines) do Widgets.SetText(line.text, "·") end
     if (Widgets.fonts.display or Widgets.fonts.body) and not textRenders({ title, tabWidgets[1] and tabWidgets[1].label }) then
         Log.Info("menu fonts: the theme's fonts laid out empty (the engine could not read them); using the engine font")
         themeFontsFailed = true
@@ -760,10 +762,10 @@ local function build(controller)
     end
     view.widgets = {
         root = root, frame = frame, frameSlot = frameSlot, tabs = tabWidgets, pages = pages, scroll = scroll, scrollTrack = scrollTrack,
-        description = description, footer = footer,
+        description = description, footer = footer, pickerWarmupTicks = PICKER_WARMUP_TICKS,
     }
     view.shownTabIndex = nil
-    view.shown = {}
+    view.shown = { pickerVisible = false }   -- (it is visible, but only for the warm-up)
 end
 
 -- The menu is laid out for 1080p and scaled to the viewport (UMG's own DPI scale divided out).
@@ -918,8 +920,13 @@ local function drawTabCounts()
     end
 end
 
-local function invalidateLayout(widgets)
-    for _, widget in ipairs(widgets) do try(function() widget:InvalidateLayoutAndVolatility() end) end
+-- The warm-up is over (its ticks ran out, or a list opened): full opacity, hidden unless open.
+local function endPickerWarmup()
+    local widgets = view.widgets
+    if not (widgets and widgets.pickerWarmupTicks) then return end
+    widgets.pickerWarmupTicks = nil
+    try(function() widgets.description.picker.box:SetRenderOpacity(1.0) end)
+    if not view.list then Widgets.SetVisible(widgets.description.picker.box, false) end
 end
 
 -- What the selected row does; while an action waits for its second press, what it will do and how
@@ -933,12 +940,8 @@ local function drawDescription(item)
     setVisible(shown, "bodyVisible", description.bodyBox, not listOpen)
     if changed(shown, "pickerVisible", listOpen) then
         Log.Debug("menu: list panel " .. (listOpen and "shown" or "hidden"))
+        if listOpen then endPickerWarmup() end
         Widgets.SetVisible(description.picker.box, listOpen)
-        -- Showing a widget that started hidden did not always repaint it: the list opened (the log
-        -- said so) but showed only after the next change. So its layout is invalidated now and
-        -- once more on the next tick.
-        invalidateLayout({ description.picker.box, description.box })
-        view.invalidateNextTick = { description.picker.box, description.box }
     end
     setText(shown, "descriptionPosition", description.position, listOpen and drawPicker(description.picker, view.list) or "")
     if listOpen then return end
@@ -1145,9 +1148,9 @@ function Menu.Tick()
             return
         end
     end
-    if view.invalidateNextTick then
-        invalidateLayout(view.invalidateNextTick)
-        view.invalidateNextTick = nil
+    local warmup = view.widgets.pickerWarmupTicks
+    if warmup then
+        if warmup <= 1 then endPickerWarmup() else view.widgets.pickerWarmupTicks = warmup - 1 end
     end
     if App.status ~= view.shown.status or os.clock() >= view.nextRefreshAt then
         view.nextRefreshAt = os.clock() + REFRESH_INTERVAL
