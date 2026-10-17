@@ -34,6 +34,5 @@ return {
         descriptionEdge = "#2A221D",
         chipEdge = "#5A4E44",
         chipText = "#D8CDB8",
-        sliderTrack = "#2A221D",
     },
 }

@@ -106,6 +106,7 @@ Copy-Item (Join-Path $build "*") $target -Recurse -Force
 "Installed to $target"
 
 # Fonts: a cooked .ufont is the plain font file, read from where the font's package name points.
+# (tools/smoke_test.py lays the fonts out the same way.)
 if ($contentTarget) {
     $fonts = Join-Path $contentTarget "Fonts"
     if (Test-Path $fonts) { Remove-Item $fonts -Recurse -Force }

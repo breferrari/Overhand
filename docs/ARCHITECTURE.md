@@ -70,13 +70,12 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 | `override.lua` | Change a game value and put the vanilla value back later, even when the game changes it in between. What is changed is an accessor (read/write, saved or not): `Override.PROPERTY` here, GAS attributes in `gas/`. |
 | `runner.lua` | The per-tick loop for the game's features: detects a new player character (new world), runs once-per-world checks, ticks every feature guarded on its own. |
 | `bug_report.lua` | `<name>-BugReport.txt`: settings, the game's sections, recent log lines. |
-| `ui/menu.lua` | The menu framework: item kinds (toggle, choice, action, section, info; sub-rows, descriptions), navigation, drawing only what changed, open/close. The layout: header (mark, title, game name, tabs with changed-row counts), rows (OFF \| ON toggles, ‹ value › choices, a mark on rows changed from vanilla), the selected row's description, a footer with the status, the changed count and the buttons that act on the selected row. |
-| `ui/widgets.lua` | Building UMG widgets from Lua: text, borders, outlines, bars, diamonds, sliders, key and face-button chips, icons, textures from PNG files; the theme (colour roles written as sRGB hex, converted to the linear colours UMG draws with). |
+| `ui/menu.lua` | The menu framework: item kinds (toggle, choice, list (a choice with a dropdown), action, section, info; sub-rows, descriptions), navigation, drawing only what changed, open/close. The layout: header (mark, title, game name, tabs with changed-row counts), rows (OFF \| ON toggles, ‹ value › choices, a mark on rows changed from vanilla), the selected row's description, a footer with the status, the changed count and the buttons that act on the selected row. |
+| `ui/widgets.lua` | Building UMG widgets from Lua: text, borders, outlines, bars, diamonds, shrink-to-fit boxes, key and face-button chips, tinted icons, textures from PNG files, the theme's fonts; the theme (colour roles written as sRGB hex, converted to the linear colours UMG draws with). |
 | `ui/input.lua` | Keyboard queue, controller polling (L3 + R3, D-pad, A, B, LB, RB), blocking the game's input while the menu is open. |
 | `ui/game_menus.lua` | Is one of the game's own menus open? (classes from the game, cached widgets) |
 | `ui/icon_finder.lua` | Writes the loaded images that look like controller button prompts to a file, to map the game's own icons. |
 | `ui/fonts.lua` | The theme's fonts at runtime: a FontFace per installed font file (streamed from the path its package name maps to) and a Font copied from the engine's Roboto with its typefaces pointed at them. Falls back to the engine font when a file is missing. |
-| `ui/font_finder.lua` | Writes the game's loaded fonts to a file, to pick the game's own fonts for a theme. |
 
 ## src/gas/
 

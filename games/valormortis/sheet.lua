@@ -9,7 +9,6 @@ local Settings = require("core.settings")
 local BugReport = require("core.bug_report")
 local Menu = require("core.ui.menu")
 local IconFinder = require("core.ui.icon_finder")
-local FontFinder = require("core.ui.font_finder")
 local Game = require("game.game")
 local Combat = require("game.features.combat")
 local Resources = require("game.features.resources")
@@ -126,7 +125,7 @@ local function combatTab()
             { description = "How long a dodge keeps you invulnerable." }),
         Menu.Section("Actions"),
         Menu.Action("Kill all enemies nearby", Combat.KillEnemiesNearby,
-            { confirm = "Kills every enemy within 60 m.", description = "Kills every enemy within 60 m. Asks to confirm." }),
+            { confirm = "Kills every enemy within 60 m." }),
     }
 end
 
@@ -178,11 +177,6 @@ local function giveTab()
         return itemCache.options
     end
 
-    -- an action that can not be undone asks first, and says so in its description
-    local function unlock(label, run, what)
-        return Menu.Action(label, run, { confirm = what .. NOT_UNDONE, description = what .. NOT_UNDONE })
-    end
-
     return {
         Menu.Action("+1,000 Catalysts", function() Give.Catalysts(1000) end, { description = "Adds 1,000 catalysts." }),
         Menu.Action("+10,000 Catalysts", function() Give.Catalysts(10000) end, { description = "Adds 10,000 catalysts." }),
@@ -190,13 +184,13 @@ local function giveTab()
             { description = "Adds 99 of every upgrade material." }),
         Menu.Action("+5 of every consumable", function() Give.EveryConsumable(5) end,
             { description = "Adds 5 of every consumable." }),
-        unlock("Unlock all weapons", Give.AllWeapons, "Adds every weapon to this save."),
-        unlock("Unlock all abilities", Give.AllAbilities, "Unlocks every ability on this save."),
-        unlock("Unlock all gems", Give.AllGems, "Adds every gem to this save."),
+        Menu.Action("Unlock all weapons", Give.AllWeapons, { confirm = "Adds every weapon to this save." .. NOT_UNDONE }),
+        Menu.Action("Unlock all abilities", Give.AllAbilities, { confirm = "Unlocks every ability on this save." .. NOT_UNDONE }),
+        Menu.Action("Unlock all gems", Give.AllGems, { confirm = "Adds every gem to this save." .. NOT_UNDONE }),
         Menu.Section("Give Item"),
         Menu.Choice("Category", categoryOptions, selectCategory, { description = "What kind of item to give." }),
-        Menu.Choice("Item", itemOptions, entry, { slider = true,
-            description = "The item to give. With the mouse, the slider scrolls through long lists." }),
+        Menu.Choice("Item", itemOptions, entry, { list = true,
+            description = "The item to give. Press to pick it from the list." }),
         Menu.Choice("Amount", labeled({ { "1", 1 }, { "5", 5 }, { "10", 10 }, { "25", 25 }, { "50", 50 },
             { "99", 99 }, { "250", 250 }, { "999", 999 } }), amount, { wrap = false, description = "How many to give." }),
         Menu.Action("Give", function() Give.Item(entry.get(), amount.get()) end,
@@ -215,15 +209,14 @@ local function miscTab()
     return {
         Menu.Action("Turn everything off", turnEverythingOff, { confirm = "Sets every cheat back to vanilla.", anytime = true,
             description = "Every cheat back to vanilla. Menu settings (theme fonts, debug logging) stay as they are." }),
-        Menu.ThemeFontsToggle(),
+        Menu.Toggle("Theme fonts", "themeFonts", { onChange = Menu.Rebuild,
+            description = "The menu's own typefaces. Turn off to use the game engine's font instead." }),
         Menu.Toggle("Debug logging", "debugLogging",
             { description = "Writes more detail to " .. App.name .. ".log, for bug reports." }),
         Menu.Action("Write bug report", BugReport.Write, { anytime = true, description =
             "Writes " .. App.name .. "-BugReport.txt into the mod folder: settings, game state and the last log lines." }),
         Menu.Action("Find controller button icons", IconFinder.WriteReport, { description =
             "Lists the game's controller button images in " .. App.name .. "-ButtonIcons.txt, so the menu can use them." }),
-        Menu.Action("Find fonts", FontFinder.WriteReport, { description =
-            "Lists the game's loaded fonts in " .. App.name .. "-Fonts.txt, so the menu can use them." }),
         Menu.Info(function() return App.name .. " v" .. App.version end),
     }
 end

@@ -94,7 +94,7 @@ end
 -- ---------------------------------------------------------------------------
 -- While the menu is open the character does not move, look around or act: his own input is
 -- disabled and the controller ignores move and look input.
---   Opened with the keyboard: UI-only input mode with the mouse cursor (for the sliders); game
+--   Opened with the keyboard: UI-only input mode with the mouse cursor; game
 --     menus do not open on Esc.
 --   Opened with the controller: game-and-UI input mode, because in UI-only mode the game stops
 --     processing controller buttons and the menu could not read them (tested in Valor Mortis). The

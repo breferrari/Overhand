@@ -13,7 +13,7 @@ local Widgets = {}
 local try = Unreal.Try
 
 -- ESlateVisibility
-local SHOWN = 4        -- SelfHitTestInvisible: drawn, children (sliders) still take the mouse
+local SHOWN = 4        -- SelfHitTestInvisible: drawn, not hit by the mouse itself
 local COLLAPSED = 1
 
 -- EHorizontalAlignment / EVerticalAlignment
@@ -56,7 +56,6 @@ local DEFAULT_PALETTE = {
     buttonB = "#9B2B2B",
     buttonX = "#2F5E9E",
     buttonY = "#B08A2E",
-    sliderTrack = "#2E2E2E",
 }
 
 Widgets.COLORS = {}
@@ -70,22 +69,20 @@ end
 
 Widgets.ApplyTheme(nil)
 
--- Widget names must be unique per outer; every build gets its own prefix. Constructing over an
--- existing name of another class is a fatal engine error (the game crashes), so a repeated name is
--- refused here as a Lua error instead.
-local buildNumber = 0
-local usedNames = {}
+-- Every widget gets a name of its own: the build number and a running count make it unique, so no
+-- two widgets can ever share one (constructing over an existing name of another class is a fatal
+-- engine error). The name passed in only makes the widget recognisable in Live View.
+local buildNumber, constructed = 0, 0
 function Widgets.StartBuild()
     buildNumber = buildNumber + 1
-    usedNames = {}
+    constructed = 0
 end
 
 function Widgets.Construct(classPath, outer, name)
-    if usedNames[name] then error("widget name used twice: " .. name) end
-    usedNames[name] = true
     local widgetClass = Unreal.Static(classPath)
     if not Unreal.IsValid(widgetClass) then error("missing class " .. classPath) end
-    local widget = StaticConstructObject(widgetClass, outer, FName(App.name .. buildNumber .. "_" .. name))
+    constructed = constructed + 1
+    local widget = StaticConstructObject(widgetClass, outer, FName(App.name .. buildNumber .. "_" .. constructed .. "_" .. name))
     if not Unreal.IsValid(widget) then error("could not construct " .. classPath) end
     return widget
 end
@@ -98,48 +95,26 @@ function Widgets.SetText(textBlock, text)
     try(function() textBlock:SetText(FText(text or "")) end)
 end
 
--- The theme's fonts, found when the menu is built: { display = UFont or nil, body = UFont or nil }.
+-- The theme's fonts, set when the menu is built: { display = UFont or nil, body = UFont or nil }.
 -- Without one, text uses the engine's default font (Roboto).
 Widgets.fonts = {}
 
--- A font spec is one of:
---   { faces = { Regular = "Cinzel-SemiBold", Bold = "Cinzel-Bold" } }  font files the installer put
---       in the game's Content folder (core/ui/fonts.lua builds the font)
---   "/Game/UI/Fonts/F_Title.F_Title"                                    a font the game has
---   { "Cinzel", "Trajan" }                                              name fragments matched against
---       the fonts the game has loaded, first fragment first
-local function findFont(role, spec, loadedFonts)
-    if type(spec) == "string" then
-        local font = Unreal.Static(spec)
-        return Unreal.IsValid(font) and font or nil
-    end
-    if spec.faces then
-        local font, reason = Fonts.Build(role:sub(1, 1):upper() .. role:sub(2), spec.faces)
-        if not font then Log.Info("menu fonts: " .. role .. " stays on the engine font (" .. tostring(reason) .. ")") end
-        return font
-    end
-    for _, fragment in ipairs(spec) do
-        for _, font in ipairs(loadedFonts) do
-            local name = try(function() return font:GetFullName() end)
-            if name and name:lower():find(fragment:lower(), 1, true) then return font end
-        end
-    end
-    return nil
+-- A font spec is either { faces = { Regular = "Cinzel-SemiBold", Bold = "Cinzel-Bold" } } (font
+-- files the installer put in the game's Content folder; core/ui/fonts.lua builds the font) or the
+-- path of a font the game has ("/Game/UI/Fonts/F_Title.F_Title").
+local function findFont(role, spec)
+    if type(spec) == "string" then return Unreal.FindObject(spec) end
+    local font, reason = Fonts.Build(role:sub(1, 1):upper() .. role:sub(2), spec.faces)
+    if not font then Log.Info("menu fonts: " .. role .. " stays on the engine font (" .. tostring(reason) .. ")") end
+    return font
 end
 
--- specs: { display = spec, body = spec } (both optional). One search of the loaded fonts, only
--- when a spec is a name list; called once per menu build.
+-- specs: { display = spec, body = spec } (both optional), or nil for the engine font.
 function Widgets.ResolveFonts(specs)
     Widgets.fonts = {}
-    if not specs then return Widgets.fonts end
-    local loadedFonts
-    for role, spec in pairs(specs) do
-        if type(spec) == "table" and not spec.faces and not loadedFonts then loadedFonts = FindAllOf("Font") or {} end
-        Widgets.fonts[role] = findFont(role, spec, loadedFonts)
-    end
-    Log.Limited("menu fonts", 4, "menu fonts: display " .. (Widgets.fonts.display and "theme" or "engine")
+    for role, spec in pairs(specs or {}) do Widgets.fonts[role] = findFont(role, spec) end
+    Log.Info("menu fonts: display " .. (Widgets.fonts.display and "theme" or "engine")
         .. ", body " .. (Widgets.fonts.body and "theme" or "engine"))
-    return Widgets.fonts
 end
 
 -- The typeface for a weight ("Regular", "Medium", "SemiBold", "Bold"). The theme's fonts have them
@@ -158,10 +133,15 @@ function Widgets.SetWeight(textBlock, weight, display)
     end)
 end
 
+-- Roboto is much wider than the theme's condensed faces: its letter spacing is tightened so text
+-- laid out for the theme still fits.
+local ENGINE_FONT_SPACING = 0.4
+
 -- style (optional): { weight = "Medium" | "SemiBold" | "Bold" (default Regular),
 --                     display = true (the theme's display font instead of its body font),
 --                     spacing = 120 (thousandths of an em), lineHeight = 1.15 (of the font's own),
---                     center = true, wrap = true }
+--                     center = true, wrap = true, ellipsis = true (cut off with "..." when the
+--                     space runs out) }
 function Widgets.Text(tree, name, text, fontSize, color, style)
     style = style or {}
     local textBlock = Widgets.Construct("/Script/UMG.TextBlock", tree, name)
@@ -172,13 +152,17 @@ function Widgets.Text(tree, name, text, fontSize, color, style)
         if fontObject then font.FontObject = fontObject end
         font.Size = fontSize
         font.TypefaceFontName = FName(typefaceFor(style.weight or "Regular", style.display))
-        if style.spacing then font.LetterSpacing = style.spacing end
+        if style.spacing then font.LetterSpacing = math.floor(style.spacing * (fontObject and 1 or ENGINE_FONT_SPACING)) end
         textBlock:SetFont(font)
     end)
     Widgets.SetTextColor(textBlock, color)
     if style.center then try(function() textBlock:SetJustification(1) end) end   -- ETextJustify::Center
     if style.wrap then try(function() textBlock:SetAutoWrapText(true) end) end
     if style.lineHeight then try(function() textBlock.LineHeightPercentage = style.lineHeight end) end
+    if style.ellipsis then
+        try(function() textBlock:SetClipping(1) end)                -- EWidgetClipping::ClipToBounds
+        try(function() textBlock:SetTextOverflowPolicy(1) end)      -- ETextOverflowPolicy::Ellipsis
+    end
     return textBlock
 end
 
@@ -190,6 +174,10 @@ function Widgets.Border(tree, name, color, padding)
 end
 
 function Widgets.SetColor(border, color) try(function() border:SetBrushColor(color) end) end
+
+function Widgets.SetColors(borders, color)
+    for _, border in ipairs(borders) do Widgets.SetColor(border, color) end
+end
 
 -- Rounded corners on a border's brush (radius in slate units; nil: a pill / circle). Where the
 -- engine does not take it the border stays square.
@@ -207,10 +195,12 @@ function Widgets.Round(border, radius)
     end)
 end
 
-function Widgets.SizeBox(tree, name, width, height)
+-- width / height: fixed sizes; minWidth: at least this wide.
+function Widgets.SizeBox(tree, name, width, height, minWidth)
     local sizeBox = Widgets.Construct("/Script/UMG.SizeBox", tree, name)
     if width then try(function() sizeBox:SetWidthOverride(width) end) end
     if height then try(function() sizeBox:SetHeightOverride(height) end) end
+    if minWidth then try(function() sizeBox:SetMinDesiredWidth(minWidth) end) end
     return sizeBox
 end
 
@@ -226,11 +216,38 @@ function Widgets.Bar(tree, name, color, width, height)
     return box, fill
 end
 
+-- Padding on a slot or a border (both have SetPadding).
+function Widgets.Pad(target, left, top, right, bottom)
+    try(function() target:SetPadding({ Left = left, Top = top, Right = right, Bottom = bottom }) end)
+end
+
+-- Alignment of a slot, or of a border's content (both have the setters).
+function Widgets.Align(target, horizontal, vertical)
+    if horizontal then try(function() target:SetHorizontalAlignment(horizontal) end) end
+    if vertical then try(function() target:SetVerticalAlignment(vertical) end) end
+end
+
+function Widgets.CenterVertically(slot) Widgets.Align(slot, nil, Widgets.CENTER) end
+
+-- A box slot that takes the space left over.
+function Widgets.Fill(slot) try(function() slot:SetSize({ Value = 1.0, SizeRule = 1 }) end) end
+
+-- Adds a child to a horizontal box, centred on the line, with space left and right of it.
+function Widgets.AddCentered(box, child, left, right)
+    local slot = box:AddChild(child)
+    Widgets.CenterVertically(slot)
+    if left or right then Widgets.Pad(slot, left or 0, 0, right or 0, 0) end
+    return slot
+end
+
 -- content inside a 1-unit outline drawn as four bars (so whatever is behind shows through the
--- content, unlike a border filled with the outline colour). Returns the outline and its bars.
+-- content, unlike a border filled with the outline colour). The content fills the outline. Returns
+-- the outline and its bars.
 function Widgets.Outlined(tree, name, content, color)
     local overlay = Widgets.Overlay(tree, name)
-    Widgets.Pad(overlay:AddChild(content), 1, 1, 1, 1)
+    local contentSlot = overlay:AddChild(content)
+    Widgets.Align(contentSlot, Widgets.FILL, Widgets.FILL)
+    Widgets.Pad(contentSlot, 1, 1, 1, 1)
     local sides = {
         { "Top", nil, 1, Widgets.FILL, Widgets.START },
         { "Bottom", nil, 1, Widgets.FILL, Widgets.END },
@@ -246,24 +263,14 @@ function Widgets.Outlined(tree, name, content, color)
     return overlay, bars
 end
 
-function Widgets.SetColors(borders, color)
-    for _, border in ipairs(borders) do Widgets.SetColor(border, color) end
+-- content shrunk evenly when it is wider than the space it gets (never enlarged).
+function Widgets.ShrinkToFit(tree, name, content)
+    local scaleBox = Widgets.Construct("/Script/UMG.ScaleBox", tree, name)
+    try(function() scaleBox:SetStretch(3) end)              -- EStretch::ScaleToFitX
+    try(function() scaleBox:SetStretchDirection(1) end)     -- EStretchDirection::DownOnly
+    scaleBox:SetContent(content)
+    return scaleBox
 end
-
--- Padding on a slot or a border (both have SetPadding).
-function Widgets.Pad(target, left, top, right, bottom)
-    try(function() target:SetPadding({ Left = left, Top = top, Right = right, Bottom = bottom }) end)
-end
-
-function Widgets.Align(slot, horizontal, vertical)
-    if horizontal then try(function() slot:SetHorizontalAlignment(horizontal) end) end
-    if vertical then try(function() slot:SetVerticalAlignment(vertical) end) end
-end
-
-function Widgets.CenterVertically(slot) Widgets.Align(slot, nil, Widgets.CENTER) end
-
--- A box slot that takes the space left over.
-function Widgets.Fill(slot) try(function() slot:SetSize({ Value = 1.0, SizeRule = 1 }) end) end
 
 -- A small square turned 45 degrees. Returns the box and the square (to recolour).
 function Widgets.Diamond(tree, name, size, color)
@@ -284,29 +291,38 @@ function Widgets.KeyChip(tree, name, label)
     return edge
 end
 
--- The menu's own images (white, tinted when drawn): assets/<name>.png in the mod folder, loaded
--- once per build. A missing image leaves its widget to a fallback.
+-- A PNG / JPG from disk as a texture (the engine's own importer), or nil.
+function Widgets.TextureFromFile(path, worldContext)
+    local library = Unreal.Static("/Script/Engine.Default__KismetRenderingLibrary")
+    local texture = Unreal.IsValid(library) and try(function() return library:ImportFileAsTexture2D(worldContext, path) end)
+    return Unreal.IsValid(texture) and texture or nil
+end
+
+-- The menu's own images (white, tinted when drawn): assets/<name>.png in the mod folder. Imported
+-- once and kept while the textures stay valid. A missing image leaves its widget to a fallback.
 local IMAGE_FILES = { arrowLeft = "assets/arrow-left.png", arrowRight = "assets/arrow-right.png", disc = "assets/disc.png" }
 Widgets.images = {}
 
 function Widgets.LoadImages(worldContext)
-    Widgets.images = {}
-    for key, file in pairs(IMAGE_FILES) do Widgets.images[key] = Widgets.TextureFromFile(Paths.InModFolder(file), worldContext) end
+    for key, file in pairs(IMAGE_FILES) do
+        if not Unreal.IsValid(Widgets.images[key]) then
+            Widgets.images[key] = Widgets.TextureFromFile(Paths.InModFolder(file), worldContext)
+        end
+    end
 end
 
--- An image tinted with color, at width x height; nil when the texture is missing or will not set.
-function Widgets.TintedImage(tree, name, texture, width, height, color)
+-- A texture drawn at width x height (height defaults to width), tinted with color when given; nil
+-- when there is no texture or it will not set (the caller falls back).
+function Widgets.Icon(tree, name, texture, width, height, color)
     if not texture then return nil end
-    local box = Widgets.SizeBox(tree, name .. "Box", width, height)
+    local box = Widgets.SizeBox(tree, name .. "Box", width, height or width)
     local image = Widgets.Construct("/Script/UMG.Image", tree, name)
     local ok = try(function() image:SetBrushFromTexture(texture, false) return true end)
     if not ok then return nil end
-    Widgets.SetImageColor(image, color)
+    if color then try(function() image:SetColorAndOpacity(color) end) end
     box:SetContent(image)
-    return box, image
+    return box
 end
-
-function Widgets.SetImageColor(image, color) try(function() image:SetColorAndOpacity(color) end) end
 
 local FACE_BUTTON_COLORS = { A = "buttonA", B = "buttonB", X = "buttonX", Y = "buttonY" }
 local DISC_SIZE = 18
@@ -317,7 +333,7 @@ function Widgets.ButtonChip(tree, name, label)
     local role = FACE_BUTTON_COLORS[label]
     if not role then return Widgets.KeyChip(tree, name, label) end
     local letter = Widgets.Text(tree, name .. "Label", label, 9, Widgets.COLORS.bright, { weight = "SemiBold" })
-    local disc = Widgets.TintedImage(tree, name .. "Disc", Widgets.images.disc, DISC_SIZE, DISC_SIZE, Widgets.COLORS[role])
+    local disc = Widgets.Icon(tree, name .. "Disc", Widgets.images.disc, DISC_SIZE, DISC_SIZE, Widgets.COLORS[role])
     if disc then
         local overlay = Widgets.Overlay(tree, name)
         overlay:AddChild(disc)
@@ -327,48 +343,10 @@ function Widgets.ButtonChip(tree, name, label)
     local box = Widgets.SizeBox(tree, name .. "Box", DISC_SIZE, DISC_SIZE)
     local square = Widgets.Border(tree, name .. "Square", Widgets.COLORS[role])
     Widgets.Round(square, nil)
-    try(function() square:SetHorizontalAlignment(Widgets.CENTER) end)
-    try(function() square:SetVerticalAlignment(Widgets.CENTER) end)
+    Widgets.Align(square, Widgets.CENTER, Widgets.CENTER)
     square:SetContent(letter)
     box:SetContent(square)
     return box
-end
-
--- A texture drawn at width x height; nil when it cannot be set (the caller falls back).
-function Widgets.Icon(tree, name, texture, width, height)
-    local box = Widgets.SizeBox(tree, name .. "Box", width, height or width)
-    local image = Widgets.Construct("/Script/UMG.Image", tree, name)
-    local ok = try(function() image:SetBrushFromTexture(texture, false) return true end)
-    if not ok then return nil end
-    box:SetContent(image)
-    return box
-end
-
--- A PNG / JPG from disk as a texture (the engine's own importer), or nil.
-function Widgets.TextureFromFile(path, worldContext)
-    local library = Unreal.Static("/Script/Engine.Default__KismetRenderingLibrary")
-    local texture = Unreal.IsValid(library) and try(function() return library:ImportFileAsTexture2D(worldContext, path) end)
-    return Unreal.IsValid(texture) and texture or nil
-end
-
-function Widgets.Slider(tree, name, minimum, maximum, value, width)
-    local box = Widgets.SizeBox(tree, name .. "Box", width, 18.0)
-    local slider = Widgets.Construct("/Script/UMG.Slider", tree, name)
-    try(function() slider:SetMinValue(minimum) end)
-    try(function() slider:SetMaxValue(maximum) end)
-    try(function() slider:SetStepSize(1) end)
-    try(function() slider.MouseUsesStep = true end)
-    try(function() slider.IsFocusable = false end)
-    try(function() slider:SetSliderBarColor(Widgets.COLORS.sliderTrack) end)
-    try(function() slider:SetSliderHandleColor(Widgets.COLORS.accent) end)
-    try(function() slider:SetValue(value) end)
-    box:SetContent(slider)
-    return box, slider
-end
-
-function Widgets.SliderValue(slider)
-    return Unreal.TryNumber(function() return slider.Value end)
-        or Unreal.TryNumber(function() return slider:GetValue() end)
 end
 
 function Widgets.SetVisible(widget, visible)

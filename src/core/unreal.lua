@@ -153,6 +153,14 @@ function Unreal.Static(path)
     return staticObjects[path]
 end
 
+-- An object by its full path ("/Game/Dir/Asset.Asset"), or nil when it does not exist. Unlike a bare
+-- StaticFindObject this never raises (UE4SS raises on paths it cannot split, e.g. a package name).
+local function findObject(path) return StaticFindObject(path) end
+function Unreal.FindObject(path)
+    local ok, object = pcall(findObject, path)
+    return ok and Unreal.IsValid(object) and object or nil
+end
+
 -- Is a key or controller button held on this player controller? keyName is an Unreal FKey name
 -- ("SpaceBar", "Gamepad_FaceButton_Bottom", ...); the key struct is built once per name.
 local keyStructs = {}

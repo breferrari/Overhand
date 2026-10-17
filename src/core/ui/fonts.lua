@@ -8,8 +8,9 @@
 -- faces and renamed to its weight ("Regular", "Medium", "SemiBold", "Bold"). Everything is created
 -- once per session and kept (root set), and found again by name after that.
 --
--- When a file is missing, or the copy has no typeface entries to fill, Build returns nil and the
--- menu keeps the engine's font.
+-- The files are looked for where the engine will read them: its own Content folder
+-- (KismetSystemLibrary.GetProjectContentDirectory). When a file is missing, or the copy has no
+-- typeface entries to fill, Build returns nil and the menu keeps the engine's font.
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
@@ -18,32 +19,31 @@ local Paths = require("core.paths")
 
 local Fonts = {}
 
-local isValid = Unreal.IsValid
+local isValid, find = Unreal.IsValid, Unreal.FindObject
 
 local ROBOTO = "/Engine/EngineFonts/Roboto.Roboto"
 local KEEP = 0x83          -- RF_Public | RF_Standalone | RF_MarkAsRootSet
 local STREAM = 1           -- EFontLoadingPolicy::Stream
--- the game's Content folder, from the mod folder: Mods inside Binaries/Win64/ue4ss, or Win64 itself
-local CONTENT_FROM_MOD_FOLDER = { "../../../../../Content/", "../../../../Content/" }
 
 local function packageRoot() return "/Game/" .. App.name .. "/Fonts/" end
 
-local function find(path)
-    local object = StaticFindObject(path)
-    return isValid(object) and object or nil
+-- The game's Content folder as the engine sees it (where a /Game/ package name points), or nil.
+local function contentFolder()
+    local library = Unreal.Static("/Script/Engine.Default__KismetSystemLibrary")
+    local folder = Unreal.Try(function() return library:GetProjectContentDirectory() end)
+    if folder ~= nil and type(folder) ~= "string" then folder = Unreal.Try(function() return folder:ToString() end) end
+    return type(folder) == "string" and folder ~= "" and folder or nil
 end
 
--- The face's file on disk, or nil when the installer did not put it there.
-function Fonts.FileFor(faceName)
-    for _, contentFolder in ipairs(CONTENT_FROM_MOD_FOLDER) do
-        local path = Paths.MOD_FOLDER .. contentFolder .. App.name .. "/Fonts/" .. faceName .. ".ufont"
-        if Paths.Exists(path) then return path end
-    end
-    return nil
+-- Is the face's file where the engine will stream it from?
+local function isInstalled(folder, faceName)
+    return Paths.Exists(folder .. App.name .. "/Fonts/" .. faceName .. ".ufont")
 end
 
+-- A new package (packages have no outer). Only called for a face or font not created yet, so the
+-- name is free; it is not looked up first (UE4SS cannot look a bare package name up).
 local function package(path)
-    return find(path) or StaticConstructObject(Unreal.Static("/Script/CoreUObject.Package"), CreateInvalidObject(), FName(path), KEEP)
+    return StaticConstructObject(Unreal.Static("/Script/CoreUObject.Package"), CreateInvalidObject(), FName(path), KEEP)
 end
 
 local function face(faceName)
@@ -68,8 +68,6 @@ end
 
 local function build(name, faces)
     local fontPath = packageRoot() .. name
-    local existing = find(fontPath .. "." .. name)
-    if existing then return existing end
     local roboto = find(ROBOTO)
     if not roboto then return nil, "no engine font to copy" end
     local font = StaticConstructObject(Unreal.Static("/Script/Engine.Font"), package(fontPath), FName(name), KEEP, 0, false, false, roboto)
@@ -92,11 +90,16 @@ local function build(name, faces)
 end
 
 -- faces: { Regular = "Cinzel-SemiBold", Bold = "Cinzel-Bold", ... } (file names without .ufont;
--- Regular is required). Returns the font, or nil and why not.
+-- Regular is required). Returns the font, or nil and why not. A font built earlier this session is
+-- found again by name.
 function Fonts.Build(name, faces)
+    local existing = find(packageRoot() .. name .. "." .. name)
+    if existing then return existing end
     if not faces.Regular then return nil, "no Regular face" end
+    local folder = contentFolder()
+    if not folder then return nil, "the engine did not say where its Content folder is" end
     for _, faceName in pairs(faces) do
-        if not Fonts.FileFor(faceName) then return nil, faceName .. ".ufont not installed" end
+        if not isInstalled(folder, faceName) then return nil, faceName .. ".ufont not installed in " .. folder end
     end
     local ok, font, reason = pcall(build, name, faces)
     if not ok then return nil, tostring(font) end

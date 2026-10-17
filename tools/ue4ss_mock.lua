@@ -5,6 +5,8 @@
 
 local Mock = {}
 local nextAddress = 1000
+-- Arrays with elements: a font's typeface entries (core/ui/fonts.lua fills them, Roboto has five).
+Mock.arrayLengths = { Fonts = 5 }
 
 local function newMock(className, invalid)
     nextAddress = nextAddress + 1
@@ -19,16 +21,16 @@ local function newMock(className, invalid)
             rawset(class, "GetFName", function() return { ToString = function() return fields.__className end } end)
             return class
         end,
-        -- arrays are empty, except a font's typeface entries (core/ui/fonts.lua fills five, like Roboto)
+        -- arrays are empty, except those named in Mock.arrayLengths (by property name)
         ForEach = function(callback)
-            if fields.__className ~= "Fonts" then return end
-            for index = 1, 5 do callback(index, newMock("TypefaceEntry")) end
+            for index = 1, Mock.arrayLengths[fields.__className] or 0 do callback(index, newMock("Element")) end
         end,
-        GetArrayNum = function() return 0 end,
+        GetArrayNum = function() return Mock.arrayLengths[fields.__className] or 0 end,
         ToString = function() return fields.__className end,
         K2_GetActorLocation = function() return { X = 100.0, Y = 200.0, Z = 300.0 } end,
         GetControlRotation = function() return { Pitch = 0.0, Yaw = 90.0, Roll = 0.0 } end,
         IsInputKeyDown = function(key) return Mock.keysDown[key.KeyName:ToString()] == true end,
+        GetProjectContentDirectory = function() return Mock.contentDirectory end,
     }
     setmetatable(mock, {
         __index = function(_, key)
@@ -49,6 +51,8 @@ Mock.controllerClass = config.controllerClass or "PlayerController"
 Mock.controller = newMock(Mock.controllerClass)
 Mock.controller.Pawn = newMock(config.playerClass or "Character")
 Mock.worldReady = false   -- false: main menu (no player controller found)
+Mock.ownPackages = "/Game/" .. (config.modName or "Mod") .. "/"
+Mock.contentDirectory = config.contentDirectory   -- the game's Content folder (engine's view)
 
 Mock.keyBinds = {}
 Mock.keysDown = {}   -- controller buttons held, by FKey name
@@ -61,9 +65,9 @@ function FindAllOf(className)
     end
     return nil
 end
--- Objects the mod creates itself (its fonts under /Game/<mod>/) do not exist until it does.
+-- Objects the mod creates itself (under /Game/<mod>/) do not exist before it does.
 function StaticFindObject(path)
-    if path:find("^/Game/Overhand/") then return newMock("Missing", true) end
+    if path:sub(1, #Mock.ownPackages) == Mock.ownPackages then return newMock("Missing", true) end
     return newMock(path:match("([%w_]+)$") or "Static")
 end
 function StaticConstructObject() return newMock("Constructed") end

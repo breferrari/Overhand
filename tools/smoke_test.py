@@ -46,6 +46,7 @@ def assemble(game: str, manifest: dict, into: pathlib.Path) -> pathlib.Path:
     shutil.copytree(GAMES / game, scripts / "game", ignore=shutil.ignore_patterns("manifest.json"))
     shutil.copytree(REPO / "assets", mod / "assets")
     if manifest.get("contentPath"):
+        # as tools/install.ps1 does: assets/fonts/*.ttf -> <contentPath>/<modName>/Fonts/*.ufont
         fonts = into / pathlib.PureWindowsPath(manifest["contentPath"]).as_posix() / manifest["modName"] / "Fonts"
         fonts.mkdir(parents=True)
         for font in (REPO / "assets" / "fonts").glob("*.ttf"):
@@ -82,9 +83,13 @@ def run_mod(mod: pathlib.Path, manifest: dict, walk_menu: bool = True) -> list[s
     lua = lua54.LuaRuntime()
     scripts = (mod / "Scripts").as_posix()
     lua.execute(f'package.path = "{scripts}/?.lua;" .. package.path')
+    game_folder = mod.parents[len(pathlib.PureWindowsPath(manifest["modsPath"]).parts)]
+    content = game_folder / pathlib.PureWindowsPath(manifest.get("contentPath", "Content")).as_posix()
     lua.globals().MockConfig = lua.table_from({
         "controllerClass": expectations.get("controllerClass", "PlayerController"),
         "playerClass": expectations.get("playerClass", "Character"),
+        "modName": manifest["modName"],
+        "contentDirectory": content.as_posix() + "/",
     })
     mock = lua.execute(f'return dofile("{MOCK.as_posix()}")')
     lua.execute(f'dofile("{scripts}/main.lua")')

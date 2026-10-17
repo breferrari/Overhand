@@ -27,10 +27,9 @@ Adding a game: [docs/PORTING.md](docs/PORTING.md) (worked example: Atomic Heart)
 | **F5** | **L3 + R3** (click both sticks) | open / close |
 | **Up / Down** | **D-pad up / down** | select a row (hold to repeat) |
 | **Left / Right** | **D-pad left / right** | change the value (hold to repeat) |
-| **Enter** | **A** | toggle, or run an action |
+| **Enter** | **A** | toggle, run an action, or open a list (then pick with Enter / A, back with Esc / B) |
 | **Q / E** | **LB / RB** | previous / next tab |
 | **Esc** | **B** | close |
-| **Mouse** | | drag the slider on long lists |
 
 The footer shows the buttons of the device you opened the menu with (or the game's own button icons, once mapped), and only those that do something on the selected row. While the menu is open your character doesn't move, look around or act. The menu won't open over a game menu, and closes itself when one appears. Risky one-way actions need **Enter (or A) twice**.
 
