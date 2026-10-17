@@ -212,10 +212,15 @@ local function questsTab()
     local quest = Menu.Value(nil)
     return {
         Menu.Choice("Quest", Quests.Options, quest, { list = true,
-            description = "Every quest in the game: active first, then not started, then done. Press to pick one." }),
+            description = "Your active quests. Press to pick one and see what its current step asks for." }),
         Menu.Info(function() return Quests.Describe(quest.get()) end),
-        Menu.Action("Refresh the list", Quests.Refresh, { description = "Reads the quests again (after progress)." }),
-        Menu.Info(function() return "Read only: changing quests from outside breaks the game's quest system. A missing quest item: Give > Quest Items." end),
+        Menu.Action("Refresh the list", Quests.Refresh, { description = "Reads your quests again (after progress)." }),
+        Menu.Action("Write quest report", Quests.WriteReport, { description =
+            "Writes " .. App.name .. "-Quests.txt: how the game's quests and their steps are built, to make a quest helper." }),
+        Menu.Info(function()
+            local count = Quests.ActiveCount()
+            return (count and (count .. " active quests. ") or "") .. "Read only: changing quests from outside breaks the game's quest system."
+        end),
     }
 end
 
