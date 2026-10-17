@@ -27,7 +27,7 @@ Adding a game: [docs/PORTING.md](docs/PORTING.md) (worked example: Atomic Heart)
 | **F5** | **L3 + R3** (click both sticks) | open / close |
 | **Up / Down** | **D-pad up / down** | select a row (hold to repeat) |
 | **Left / Right** | **D-pad left / right** | change the value (hold to repeat) |
-| **Enter** | **A** | toggle, run an action, or open a list (then pick with Enter / A, back with Esc / B) |
+| **Enter** | **A** | toggle, run an action, or open a list (then Left / Right a page, pick with Enter / A, back with Esc / B) |
 | **Q / E** | **LB / RB** | previous / next tab |
 | **Esc** | **B** | close |
 
@@ -71,6 +71,7 @@ All inside `Mods\Overhand\`:
 | `Overhand.log`, `.log.old` | this session and the previous one |
 | `Overhand-BugReport.txt` | only when you press *Write bug report* |
 | `Overhand-ButtonIcons.txt` | only when you press *Find controller button icons* |
+| `Overhand-Quests.txt` | only when you press *Write quest report* (Valor Mortis) |
 
 ## Valor Mortis
 
@@ -81,7 +82,7 @@ All inside `Mods\Overhand\`:
 | **Combat** | One-Hit Kills · Damage Multiplier up to 10x · Every Block Is A Perfect Parry (two-handed weapons too) · Claymore Can Parry · Parry Window 0.5–6x · Dodge Window 0.5–4x · Kill All Enemies Nearby (60 m) |
 | **Items** | Infinite Ammo (optionally still reloading) · Infinite Healing Flasks · Infinite Consumables · Infinite Buffs (potions, coatings, pistol boosts) · No Item Cooldowns · Keep Catalysts On Death (also deaths without a deathmark) · No Ability Costs · Free Respec · Refill Everything |
 | **Give** | +1,000 / +10,000 Catalysts · +99 of every upgrade material · +5 of every consumable · Unlock all weapons / abilities / gems · **Give Item**: any consumable, material, instant or quest item from a list, 1–999 at a time (the count is checked afterwards) |
-| **Quests** | Every quest with its state and what its current step asks for (read only) |
+| **Quests** | Your active quests and what each one's current step asks for (read only) · Refresh the list · Write quest report |
 | **Misc** | Turn everything off · Debug logging · Write bug report · Find controller button icons |
 
 Overhand replaces the Valor Mortis Cheat Menu and AeonGreyh's Passive Health Regen; the install switches them off. Damage multipliers left in a save by Cheat Menu 1.1.0 and older are repaired automatically.
