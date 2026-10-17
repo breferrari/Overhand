@@ -2,34 +2,19 @@
   <img src="docs/images/banner.png" alt="Overhand">
 </p>
 
-<p align="center">
-  <b>In-game cheat menus for Unreal Engine games, built on UE4SS.</b><br>
-  One menu. Every cheat. Off means vanilla.
-</p>
+<img src="docs/images/menu.png" align="right" width="380" alt="The Overhand menu in Valor Mortis">
 
-<p align="center">
-  <img src="https://img.shields.io/badge/UE4SS-Lua%205.4-2f6fb5?style=flat-square" alt="UE4SS Lua 5.4">
-  <img src="https://img.shields.io/badge/made%20for-Unreal%20Engine-1f1f1f?style=flat-square&logo=unrealengine&logoColor=white" alt="Made for Unreal Engine">
-  <img src="https://img.shields.io/badge/platform-Windows-0078d4?style=flat-square" alt="Windows">
-  <img src="https://img.shields.io/badge/stores-Steam%20%7C%20Xbox%20%7C%20Epic%20%7C%20GOG-555?style=flat-square" alt="Steam, Xbox app, Epic Games, GOG">
-  <img src="https://img.shields.io/badge/license-MIT-3a3?style=flat-square" alt="MIT license">
-</p>
+One menu with every cheat, inside the game, built on [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS). Press **F5**, or click **both sticks** on a controller, pick a tab and change a value.
 
-<p align="center">
-  <img src="docs/images/menu.png" width="560" alt="The Overhand menu in Valor Mortis">
-</p>
-
-Press **F5**, or click **both sticks** on a controller, pick a tab and change a value. That's it.
-
-## Highlights
-
-- **Off means vanilla.** Every cheat can be switched off at any time and puts the game back exactly as it was. Nothing runs that you didn't switch on.
+- **A clean off switch.** Turn a cheat off and the game is exactly as it was before. Nothing runs that you didn't switch on.
 - **Controller first, keyboard too.** Full menu control from a gamepad; the footer shows only the buttons that do something on the selected row, for the device you opened it with.
-- **Explains itself.** Every row says what it does; rows changed from vanilla carry a red mark, and each tab counts them.
+- **Explains itself.** Every row says what it does; the rows you've changed carry a red mark, and each tab counts them.
 - **Remembers you.** Your choices are saved for the next session.
-- **Costs nothing when closed.** No per-tick object searches: every game object is found once and kept ([details](docs/PERFORMANCE.md)).
+- **Light on the game.** Closed, it does next to nothing, and a cheat that's off costs nothing ([details](docs/PERFORMANCE.md)).
 - **Safe by default.** One-way actions ask twice; the menu stays out of the way of the game's own menus.
 - **Each game looks like itself.** Every game brings its own theme: palette, mark and fonts.
+
+<br clear="right">
 
 ## Games
 
