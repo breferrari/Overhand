@@ -3,16 +3,16 @@
 --
 --   header       the mod's mark, title, a rule and the game's name; the tabs, each with how many of
 --                its rows differ from vanilla
---   rows         toggles (OFF | ON), choices (◂ value ▸), lists (value ▾, opens a dropdown),
+--   rows         toggles (OFF | ON), choices (◂ value ▸), lists (value ▾, picked from a list),
 --                actions, section titles, sub-rows; a mark on every row changed from vanilla, the
 --                selected row lit with an edge bar
---   description  what the selected row does
+--   description  what the selected row does; while a list is open, the list to pick from
 --   footer       the status line (results of actions; value changes show on their row), how many
 --                cheats are active, and the buttons that do something on the selected row
 --
 --   Keyboard: F5 / Esc open / close, Up / Down select, Left / Right change, Enter use, Q / E tabs
 --   Controller (core/ui/input.lua): L3 + R3 open / close, D-pad, A use, B close, LB / RB tabs
---   In an open dropdown: Up / Down move, Left / Right a page, Enter / A pick, Esc / B back
+--   In an open list: Up / Down move, Left / Right a page, Enter / A pick, Esc / B back
 --
 -- Knows no game: the game passes in what it needs with Menu.Configure and defines the content with
 -- Menu.AddTab (see game/sheet.lua). Everything runs on the game thread from Menu.Tick; while
@@ -45,8 +45,10 @@ local SELECTION_BAR_WIDTH = 3
 local CONTROL_WIDTH = 124      -- toggles and choices line up on the right
 local VALUE_WIDTH = 88         -- a choice's value between its arrows
 local LIST_VALUE_MAX_WIDTH = 200   -- a list's value (item names are long) is cut off past this
-local LIST_ROWS = 7            -- options shown at once in an open dropdown
-local PAGE_MAX_HEIGHT = 600    -- the rows area scrolls past this (the menu fits a 1080p screen)
+local LIST_ROWS = 6            -- options shown at once in an open list (in the description panel)
+local LIST_LINE_HEIGHT = 26
+local LIST_TRACK_WIDTH = 2     -- the list's scroll indicator
+local PAGE_MAX_HEIGHT = 520    -- the rows area scrolls past this (the menu, list open, fits 1080p)
 local MARK_SIZE = 26
 local ARROW_WIDTH, ARROW_HEIGHT = 5, 7
 local CORNER_LENGTH, CORNER_THICKNESS = 12, 2
@@ -63,8 +65,8 @@ local FONT_SIZE = {
 }
 
 -- The footer's buttons for each input device. A hint with a verb is only shown when the selected
--- row (or the open dropdown) has something for it, and says what: "press" (toggle, use, open a
--- list, pick), "change" (step a choice), "back" (close the menu, or the dropdown).
+-- row (or the open list) has something for it, and says what: "press" (toggle, use, open a
+-- list, pick), "change" (step a choice), "back" (close the menu, or the list).
 local HINTS = {
     keyboard = {
         { keys = { "Enter" }, verb = "press" },
@@ -113,7 +115,7 @@ local view = {
     selectedByTab = {},       -- tab index -> item index
     widgets = nil,            -- built on the first open
     pendingConfirm = nil,     -- the action waiting for its second Enter
-    list = nil,               -- the open dropdown: { item, highlighted, first } (option indexes)
+    list = nil,               -- the open list: { item, highlighted, first } (option indexes)
     withController = false,   -- opened with L3 + R3: controller hints and input mode
     shown = {},               -- what the description and footer show (redrawn on change)
     nextRefreshAt = 0,
@@ -191,7 +193,7 @@ function Menu.Toggle(label, keyOrAccessor, options)
 end
 
 -- options: a list of { label, value }, or a function returning one (read on every refresh, so it
--- should cache). display.list = true: Enter / A opens a dropdown (long lists); display.wrap = false
+-- should cache). display.list = true: Enter / A opens a list to pick from (long lists); display.wrap = false
 -- stops at the ends.
 function Menu.Choice(label, options, keyOrAccessor, display)
     display = display or {}
@@ -301,7 +303,7 @@ local function changeValue(direction)
     if not item then return end
     if item.kind == "toggle" then
         item.set(not item.get())
-    elseif item.kind == "choice" and not item.list then   -- a list is chosen from its dropdown
+    elseif item.kind == "choice" and not item.list then   -- a list is picked from its list
         local options = optionsOf(item)
         if #options == 0 then return end
         local index = (currentIndex(item, options) or 0) + direction
@@ -316,7 +318,7 @@ local function changeValue(direction)
     end
 end
 
--- The dropdown opens on the current option, with it in view.
+-- The list opens on the current option, with it in view.
 local function openList(item)
     local highlighted = currentIndex(item, optionsOf(item)) or 1
     view.list = { item = item, highlighted = highlighted, first = highlighted - math.floor(LIST_ROWS / 2) }
@@ -398,7 +400,7 @@ local function buildArrow(tree, name, image, fallback)
         or Widgets.Text(tree, name, fallback, FONT_SIZE.arrow, COLORS.faint)
 end
 
--- ◂ value ▸, or for a list: value ▾ (it is chosen from its dropdown; long names are cut off).
+-- ◂ value ▸, or for a list: value ▾ (picked from its list; long names are cut off).
 local function buildChoice(tree, name, item)
     local line = Widgets.HorizontalBox(tree, name .. "Choice")
     local valueBox = Widgets.SizeBox(tree, name .. "ValueBox", nil, nil, not item.list and VALUE_WIDTH or nil)
@@ -433,7 +435,7 @@ local function buildConnector(tree, name)
     return box
 end
 
--- A line of a dropdown or a row: an edge bar (lit when selected) and content. Returns the border,
+-- A line of a list or a row: an edge bar (lit when selected) and content. Returns the border,
 -- the bar and the content box.
 local function buildSelectableLine(tree, name, leftPadding, verticalPadding)
     local border = Widgets.Border(tree, name .. "Row", TRANSPARENT)
@@ -446,28 +448,6 @@ local function buildSelectableLine(tree, name, leftPadding, verticalPadding)
     Widgets.Fill(contentSlot)
     Widgets.Pad(contentSlot, leftPadding - SELECTION_BAR_WIDTH, verticalPadding, SIDE_PADDING, verticalPadding)
     return border, bar, content
-end
-
--- The dropdown under a list row: LIST_ROWS lines in an inset panel, hidden until opened. Each line:
--- a mark on the current option and the option's name.
-local function buildList(tree, page, name)
-    local panel = Widgets.Border(tree, name .. "ListPanel", COLORS.descriptionPanel, { 0, 4, 0, 4 })
-    local stack = Widgets.VerticalBox(tree, name .. "ListStack")
-    panel:SetContent(stack)
-    local lines = {}
-    for index = 1, LIST_ROWS do
-        local lineName = name .. "List" .. index
-        local border, bar, content = buildSelectableLine(tree, lineName, 14, 3)
-        local markBox, marker = Widgets.Diamond(tree, lineName .. "Current", 5, TRANSPARENT)
-        addCentered(content, markBox, 0, 9)
-        local text = Widgets.Text(tree, lineName .. "Text", "", FONT_SIZE.subRow, COLORS.label, { ellipsis = true })
-        Widgets.Fill(addCentered(content, text))
-        stack:AddChild(border)
-        lines[index] = { border = border, bar = bar, marker = marker, text = text, shown = {} }
-    end
-    local outline = Widgets.Outlined(tree, name .. "ListOutline", panel, COLORS.descriptionEdge)
-    Widgets.Pad(page:AddChild(outline), SIDE_PADDING + 14, 2, SIDE_PADDING, 6)
-    return { box = outline, lines = lines, shown = {} }
 end
 
 local function buildRow(tree, page, name, item)
@@ -497,7 +477,6 @@ local function buildRow(tree, page, name, item)
     end
 
     page:AddChild(border)
-    if item.list then rowWidgets.list = buildList(tree, page, name) end
     return rowWidgets
 end
 
@@ -582,6 +561,35 @@ local function buildHeader(tree, column)
     return tabWidgets, title
 end
 
+-- An open list: LIST_ROWS lines (a mark on the current option, the highlighted one lit) and a scroll
+-- indicator, a thumb on a track, sized and placed by the part of the list in view.
+local function buildPicker(tree)
+    local box = Widgets.HorizontalBox(tree, "Picker")
+    local stack = Widgets.VerticalBox(tree, "PickerLines")
+    local lines = {}
+    for index = 1, LIST_ROWS do
+        local lineName = "PickerLine" .. index
+        local border, bar, content = buildSelectableLine(tree, lineName, 10, 0)
+        local markBox, marker = Widgets.Diamond(tree, lineName .. "Current", 5, TRANSPARENT)
+        addCentered(content, markBox, 0, 9)
+        local text = Widgets.Text(tree, lineName .. "Text", "", FONT_SIZE.subRow, COLORS.label, { ellipsis = true })
+        Widgets.Fill(addCentered(content, text))
+        local lineBox = Widgets.SizeBox(tree, lineName .. "Box", nil, LIST_LINE_HEIGHT)
+        lineBox:SetContent(border)
+        stack:AddChild(lineBox)
+        lines[index] = { box = lineBox, border = border, bar = bar, marker = marker, text = text, shown = {} }
+    end
+    Widgets.Fill(box:AddChild(stack))
+    local track = Widgets.Overlay(tree, "PickerTrack")
+    Widgets.Align(track:AddChild((Widgets.Bar(tree, "PickerTrackLine", COLORS.edge, LIST_TRACK_WIDTH, LIST_ROWS * LIST_LINE_HEIGHT))), FILL, START)
+    local thumbBox, thumb = Widgets.Bar(tree, "PickerThumb", COLORS.highlight, LIST_TRACK_WIDTH, LIST_LINE_HEIGHT)
+    local thumbSlot = track:AddChild(thumbBox)
+    Widgets.Align(thumbSlot, FILL, START)
+    Widgets.Pad(box:AddChild(track), 8, 0, 0, 0)
+    return { box = box, lines = lines, track = track, thumbBox = thumbBox, thumbSlot = thumbSlot, thumb = thumb, shown = {} }
+end
+
+-- The selected row's name and what it does, or (a list open) the list.
 local function buildDescription(tree, column)
     local panel = Widgets.Border(tree, "Description", COLORS.descriptionPanel, { 14, 12, 14, 12 })
     local stack = Widgets.VerticalBox(tree, "DescriptionStack")
@@ -589,17 +597,21 @@ local function buildDescription(tree, column)
     local titleLine = Widgets.HorizontalBox(tree, "DescriptionTitleLine")
     addCentered(titleLine, (Widgets.Diamond(tree, "DescriptionDiamond", 5, COLORS.highlight)), 0, 8)
     local title = Widgets.Text(tree, "DescriptionTitle", "", FONT_SIZE.descriptionTitle, COLORS.highlight, { weight = "SemiBold", spacing = 160 })
-    addCentered(titleLine, title)
+    Widgets.Fill(addCentered(titleLine, title))
+    local position = Widgets.Text(tree, "DescriptionPosition", "", FONT_SIZE.descriptionTitle, COLORS.muted, { spacing = 80 })
+    addCentered(titleLine, position)
     stack:AddChild(titleLine)
     local bodyBox = Widgets.SizeBox(tree, "DescriptionBodyBox")
     try(function() bodyBox:SetMinDesiredHeight(DESCRIPTION_MIN_HEIGHT) end)
     local body = Widgets.Text(tree, "DescriptionBody", "", FONT_SIZE.description, COLORS.label, { wrap = true, lineHeight = 1.15 })
     bodyBox:SetContent(body)
     Widgets.Pad(stack:AddChild(bodyBox), 0, 6, 0, 0)
+    local picker = buildPicker(tree)
+    Widgets.Pad(stack:AddChild(picker.box), 0, 6, 0, 0)
 
     local outline = Widgets.Outlined(tree, "DescriptionOutline", panel, COLORS.descriptionEdge)
     Widgets.Pad(column:AddChild(outline), SIDE_PADDING, 0, SIDE_PADDING, 14)
-    return { box = outline, title = title, body = body }
+    return { box = outline, title = title, position = position, bodyBox = bodyBox, body = body, picker = picker }
 end
 
 -- Chips (or the game's own button images) and a label; the group hides as one.
@@ -717,15 +729,10 @@ local function build(controller)
     local footer = buildFooter(tree, column)
 
     try(function() root:AddToViewport(1000) end)
-    -- A widget that starts hidden is never laid out, and the first time it is shown Slate draws it
-    -- with no size (the first open of a dropdown showed nothing). So the dropdowns get one layout
-    -- pass while visible, then are hidden until opened.
+    -- A widget that starts hidden is never laid out, and the first time it is shown Slate may draw
+    -- it with no size. So the list gets one layout pass while visible, then is hidden until opened.
     try(function() root:ForceLayoutPrepass() end)
-    for _, page in ipairs(pages) do
-        for _, rowWidgets in pairs(page.rows) do
-            if rowWidgets.list then Widgets.SetVisible(rowWidgets.list.box, false) end
-        end
-    end
+    Widgets.SetVisible(description.picker.box, false)
     if (Widgets.fonts.display or Widgets.fonts.body) and not textRenders({ title, tabWidgets[1] and tabWidgets[1].label }) then
         Log.Info("menu fonts: the theme's fonts laid out empty (the engine could not read them); using the engine font")
         themeFontsFailed = true
@@ -806,19 +813,17 @@ local function drawToggle(rowWidgets, item)
     Widgets.SetTextColor(toggle.Off.text, on and COLORS.faint or COLORS.title)
 end
 
--- The open dropdown's lines: the highlighted option lit, the current one marked.
-local function drawList(list, item, options, current)
-    local open = view.list ~= nil and view.list.item == item
-    local visibilityChanged = changed(list.shown, "visible", open)
-    if visibilityChanged then Widgets.SetVisible(list.box, open) end
-    local justOpened = visibilityChanged and open
-    if not open then return end
-    for index, line in ipairs(list.lines) do
-        local optionIndex = view.list.first + index - 1
+-- The open list: the lines in view (the highlighted option lit, the current one marked) and the
+-- scroll indicator. Returns "12 / 34".
+local function drawPicker(picker, list)
+    local options = optionsOf(list.item)
+    local current = currentIndex(list.item, options)
+    for index, line in ipairs(picker.lines) do
+        local optionIndex = list.first + index - 1
         local option = options[optionIndex]
-        setVisible(line.shown, "visible", line.border, option ~= nil)
+        setVisible(line.shown, "visible", line.box, option ~= nil)
         if option then
-            local highlighted = optionIndex == view.list.highlighted
+            local highlighted = optionIndex == list.highlighted
             setText(line.shown, "text", line.text, option.label)
             setTextColor(line.shown, "color", line.text, highlighted and COLORS.bright or COLORS.label)
             drawLit(line.shown, line.border, line.bar, highlighted)
@@ -827,7 +832,17 @@ local function drawList(list, item, options, current)
             end
         end
     end
-    if justOpened then try(function() list.box:ForceLayoutPrepass() end) end
+    local count = math.max(#options, 1)
+    local trackHeight = LIST_ROWS * LIST_LINE_HEIGHT
+    local scrolls = #options > LIST_ROWS
+    setVisible(picker.shown, "trackVisible", picker.track, scrolls)
+    if scrolls then
+        local thumbHeight = math.max(10, math.floor(trackHeight * LIST_ROWS / count))
+        local thumbTop = math.floor((trackHeight - thumbHeight) * (list.first - 1) / math.max(count - LIST_ROWS, 1))
+        if changed(picker.shown, "thumbHeight", thumbHeight) then try(function() picker.thumbBox:SetHeightOverride(thumbHeight) end) end
+        if changed(picker.shown, "thumbTop", thumbTop) then Widgets.Pad(picker.thumbSlot, 0, thumbTop, 0, 0) end
+    end
+    return #options > 0 and (list.highlighted .. " / " .. #options) or ""
 end
 
 local function drawChoice(rowWidgets, item, isChangedNow)
@@ -838,7 +853,6 @@ local function drawChoice(rowWidgets, item, isChangedNow)
     -- a setting at its vanilla value reads quieter than a changed one
     local quiet = item.isChanged ~= nil and not isChangedNow
     setTextColor(rowWidgets.shown, "valueColor", value, quiet and COLORS.muted or COLORS.title)
-    if rowWidgets.list then drawList(rowWidgets.list, item, options, current) end
 end
 
 local function drawNumber(rowWidgets, item)
@@ -890,6 +904,14 @@ local function drawDescription(item)
     setVisible(shown, "descriptionVisible", description.box, item ~= nil)
     if not item then return end
     setText(shown, "descriptionTitle", description.title, item.upperLabel)
+    local listOpen = view.list ~= nil
+    setVisible(shown, "bodyVisible", description.bodyBox, not listOpen)
+    if changed(shown, "pickerVisible", listOpen) then
+        Widgets.SetVisible(description.picker.box, listOpen)
+        if listOpen then try(function() description.picker.box:ForceLayoutPrepass() end) end
+    end
+    setText(shown, "descriptionPosition", description.position, listOpen and drawPicker(description.picker, view.list) or "")
+    if listOpen then return end
     local confirming = view.pendingConfirm == item
     local body = confirming and (item.confirmPrompt .. (view.withController and " Press A again to confirm." or " Press Enter again to confirm."))
         or item.description or ""
@@ -897,7 +919,7 @@ local function drawDescription(item)
     setTextColor(shown, "descriptionColor", description.body, confirming and COLORS.accent or COLORS.label)
 end
 
--- What each verb hint says for this row (or the open dropdown); nil hides it.
+-- What each verb hint says for this row (or the open list); nil hides it.
 local function hintText(verb, item)
     if view.list then
         return (verb == "press" and "pick") or (verb == "change" and "page") or (verb == "back" and "back") or nil
@@ -929,16 +951,11 @@ local function drawFooter(item)
     end
 end
 
--- Scrolls the rows so the selected row, or the open dropdown's highlighted line, is visible (only
--- when that target changes).
+-- Scrolls the rows so the selected row is visible (only when it changes).
 local function keepInView(page, selectedIndex)
     local rowWidgets = selectedIndex and page.rows[selectedIndex]
     if not rowWidgets then return end
     local target = rowWidgets.border
-    if view.list and rowWidgets.list then
-        local line = rowWidgets.list.lines[view.list.highlighted - view.list.first + 1]
-        target = line and line.border or rowWidgets.list.box
-    end
     if changed(view.shown, "scrollTarget", target) then
         try(function() view.widgets.scroll:ScrollWidgetIntoView(target, false) end)
     end
@@ -1028,7 +1045,7 @@ local COMMANDS = {
     close = function() close() end,
 }
 
--- While a dropdown is open it takes the commands; anything else closes it first.
+-- While a list is open it takes the commands; anything else closes it first.
 local LIST_COMMANDS = {
     up = function() moveInList(-1) end,
     down = function() moveInList(1) end,
