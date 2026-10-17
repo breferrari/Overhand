@@ -14,13 +14,11 @@ local try, isValid = Unreal.Try, Unreal.IsValid
 local function findAction(actionName)
     local cheatManager = Game.CheatManager()
     local actions = cheatManager and try(function() return cheatManager.CheatActions end)
-    if not actions then return nil end
     local found = nil
     try(function()
         actions:ForEach(function(_, element)
-            if found then return end
             local action = element:get()
-            if isValid(action) and try(function() return action.ActionName:ToString() end) == actionName then
+            if not found and isValid(action) and try(function() return action.ActionName:ToString() end) == actionName then
                 found = action
             end
         end)
@@ -28,7 +26,7 @@ local function findAction(actionName)
     return found
 end
 
-function DevActions.Run(actionName)
+local function runAction(actionName)
     local action = findAction(actionName)
     if not action then
         Log.Info("dev action '" .. actionName .. "' not found")
@@ -43,7 +41,7 @@ end
 function DevActions.RunAll(actionNames, label)
     local done = 0
     for _, actionName in ipairs(actionNames) do
-        if DevActions.Run(actionName) then done = done + 1 end
+        if runAction(actionName) then done = done + 1 end
     end
     State.status = label .. ": " .. done .. "/" .. #actionNames .. " done"
 end
@@ -53,16 +51,16 @@ end
 -- the state decides; the console variable is only logged (it is not reliable to re-toggle from).
 -- ---------------------------------------------------------------------------
 
-local abilityCosts = { ignored = false, lastToggleAt = -99 }
+local abilityCostsIgnored = false
+local lastToggleAt = -math.huge
 
 function DevActions.Tick()
     local wanted = State.settings.noAbilityCosts == true
-    if abilityCosts.ignored ~= wanted and State.clock() - abilityCosts.lastToggleAt > 1.5 then
-        abilityCosts.lastToggleAt = State.clock()
-        if Game.CallDevCheat("IgnoreCostsToggle") then
-            abilityCosts.ignored = wanted
-            Log.Debug("AbilitySystem.IgnoreCosts now reads " .. tostring(Game.ReadConsoleBool("AbilitySystem.IgnoreCosts")))
-        end
+    if abilityCostsIgnored == wanted or os.clock() - lastToggleAt < 1.5 then return end
+    lastToggleAt = os.clock()
+    if Game.CallDevCheat("IgnoreCostsToggle") then
+        abilityCostsIgnored = wanted
+        Log.Debug("AbilitySystem.IgnoreCosts now reads " .. tostring(Game.ReadConsoleBool("AbilitySystem.IgnoreCosts")))
     end
 end
 

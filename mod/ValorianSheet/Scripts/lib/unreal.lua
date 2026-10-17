@@ -1,56 +1,74 @@
 -- ValorianSheet / lib/unreal.lua
--- Safe access to Unreal objects through UE4SS, and cached object lookups.
+-- Safe access to Unreal objects through UE4SS, cached object lookups, and the world reset.
 --
 -- Performance rule: FindAllOf walks every object in the game (hundreds of thousands), and with the
--- Crash Fix setting (bForceGUObjectArrayForIteration) it takes the slower walk. Nothing may call it
--- on a per-tick path. FindCached keeps what it found, and a lookup that found nothing waits before
--- it searches again, so code that asks every tick (main menu, loading screens) never searches every
--- tick. See docs/PERFORMANCE.md.
+-- Crash Fix setting (bForceGUObjectArrayForIteration) it takes the slower walk. This file is the only
+-- place that calls it on a schedule. FindCached / FindAllCached keep what they found, and a lookup
+-- that found nothing waits before it searches again, so code that asks every tick (main menu,
+-- loading screens) never searches every tick. See docs/PERFORMANCE.md.
+--
+-- World reset: everything cached here belongs to one world. Unreal.ResetWorld() forgets it and runs
+-- the callbacks modules registered with Unreal.OnWorldReset (for their own per-world state).
 
 local Unreal = {}
 
--- Calls fn and returns its results, or nil when it raised an error.
+-- Calls fn(...) and returns its first result, or nil when it raised an error.
 function Unreal.Try(fn, ...)
-    local ok, first, second = pcall(fn, ...)
-    if ok then return first, second end
+    local ok, result = pcall(fn, ...)
+    if ok then return result end
     return nil
 end
 
+-- Number results only (nil for errors and anything that is not a number).
+function Unreal.TryNumber(fn, ...)
+    local result = Unreal.Try(fn, ...)
+    if type(result) == "number" then return result end
+    return nil
+end
+
+-- Module-level callees, so the hot helpers below allocate no closure per call.
+local function callIsValid(object) return object:IsValid() end
+local function callGetAddress(object) return object:GetAddress() end
+local function callClassName(object) return object:GetClass():GetFName():ToString() end
+local function callFullName(object) return object:GetFullName() end
+
 function Unreal.IsValid(object)
     if object == nil then return false end
-    local ok, valid = pcall(function() return object:IsValid() end)
+    local ok, valid = pcall(callIsValid, object)
     return ok and valid == true
 end
 
-function Unreal.AddressOf(object)
-    return Unreal.Try(function() return object:GetAddress() end)
-end
+function Unreal.AddressOf(object) return Unreal.Try(callGetAddress, object) end
+function Unreal.ClassNameOf(object) return Unreal.Try(callClassName, object) end
 
-function Unreal.ClassNameOf(object)
-    return Unreal.Try(function() return object:GetClass():GetFName():ToString() end)
-end
-
--- Class default objects ("Default__...") are templates, never the live instance we want.
-function Unreal.IsDefaultObject(object)
-    local fullName = Unreal.Try(function() return object:GetFullName() end)
-    return fullName == nil or fullName:find("Default__", 1, true) ~= nil
-end
-
+-- A live instance: valid, and not a class default object ("Default__...", a template).
 function Unreal.IsLiveObject(object)
-    return Unreal.IsValid(object) and not Unreal.IsDefaultObject(object)
+    if not Unreal.IsValid(object) then return false end
+    local fullName = Unreal.Try(callFullName, object)
+    return fullName ~= nil and not fullName:find("Default__", 1, true)
+end
+
+-- Every live object of className that passes accept (optional). A full search: button presses only.
+function Unreal.FindAllLive(className, accept)
+    local found = {}
+    for _, object in ipairs(FindAllOf(className) or {}) do
+        if Unreal.IsLiveObject(object) and (not accept or accept(object)) then found[#found + 1] = object end
+    end
+    return found
 end
 
 -- ---------------------------------------------------------------------------
--- Cached lookups
+-- Cached lookups (per world)
 -- ---------------------------------------------------------------------------
 
-local cachedObjects = {}
-local nextSearchAt = {}   -- cache key -> clock time before which a missed lookup does not search again
+local cachedObjects = {}   -- key -> object, or list of objects (FindAllCached)
+local nextSearchAt = {}    -- key -> clock time before which a missed lookup does not search again
+local worldResetCallbacks = {}
 
--- Forget everything (after a map change every cached object belonged to the old world).
-function Unreal.ResetCache()
-    cachedObjects = {}
-    nextSearchAt = {}
+local function searchAllowed(key, retrySeconds)
+    if os.clock() < (nextSearchAt[key] or 0) then return false end
+    nextSearchAt[key] = os.clock() + (retrySeconds or 2)
+    return true
 end
 
 function Unreal.GetCached(key)
@@ -64,22 +82,42 @@ function Unreal.Remember(key, object)
     return object
 end
 
--- The first live object of class className that passes accept (optional), kept under key.
+-- Drop one entry (it turned out to be the wrong object); the next lookup may search right away.
+function Unreal.Forget(key)
+    cachedObjects[key] = nil
+    nextSearchAt[key] = nil
+end
+
+-- The first live object of className that passes accept (optional), kept under key.
 -- A miss is remembered for retrySeconds: no new FindAllOf before then.
 function Unreal.FindCached(key, className, retrySeconds, accept)
     local cached = Unreal.GetCached(key)
     if cached then return cached end
     cachedObjects[key] = nil
-    local now = os.clock()
-    if now < (nextSearchAt[key] or 0) then return nil end
-    nextSearchAt[key] = now + (retrySeconds or 2)
-    for _, object in ipairs(FindAllOf(className) or {}) do
-        if Unreal.IsLiveObject(object) and (not accept or accept(object)) then
-            cachedObjects[key] = object
-            break
-        end
-    end
+    if not searchAllowed(key, retrySeconds) then return nil end
+    cachedObjects[key] = Unreal.FindAllLive(className, accept)[1]
     return cachedObjects[key]
+end
+
+-- The still-valid objects kept under key by FindAllCached (never searches).
+function Unreal.GetCachedList(key)
+    local alive = {}
+    for _, object in ipairs(cachedObjects[key] or {}) do
+        if Unreal.IsValid(object) then alive[#alive + 1] = object end
+    end
+    cachedObjects[key] = alive
+    return alive
+end
+
+-- Every live object of className, kept under key. Searched again only when none of the kept objects
+-- is still valid, and then at most every retrySeconds.
+function Unreal.FindAllCached(key, className, retrySeconds)
+    local alive = Unreal.GetCachedList(key)
+    if #alive == 0 and searchAllowed(key, retrySeconds) then
+        alive = Unreal.FindAllLive(className)
+        cachedObjects[key] = alive
+    end
+    return alive
 end
 
 -- Static objects (class default objects, function libraries) never change: one lookup each.
@@ -88,6 +126,21 @@ function Unreal.Static(path)
     if Unreal.IsValid(staticObjects[path]) then return staticObjects[path] end
     staticObjects[path] = StaticFindObject(path)
     return staticObjects[path]
+end
+
+-- ---------------------------------------------------------------------------
+-- World reset
+-- ---------------------------------------------------------------------------
+
+-- callback() runs on every world reset: forget per-world state that is not an Unreal cache entry.
+function Unreal.OnWorldReset(callback)
+    worldResetCallbacks[#worldResetCallbacks + 1] = callback
+end
+
+function Unreal.ResetWorld()
+    cachedObjects = {}
+    nextSearchAt = {}
+    for _, callback in ipairs(worldResetCallbacks) do pcall(callback) end
 end
 
 return Unreal

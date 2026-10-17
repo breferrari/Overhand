@@ -10,7 +10,7 @@ local DevActions = require("features.dev_actions")
 
 local BugReport = {}
 
-BugReport.FILE = Paths.InModFolder("ValorianSheet-BugReport.txt")
+local REPORT_FILE = Paths.InModFolder("ValorianSheet-BugReport.txt")
 
 local function attributeLine(setName, attributeNames)
     local set = Game.AttributeSet(setName)
@@ -30,10 +30,7 @@ function BugReport.Write()
     add("Written: " .. os.date("%Y-%m-%d %H:%M:%S"))
     add("")
     add("== Settings ==")
-    local keys = {}
-    for key in pairs(State.settings) do keys[#keys + 1] = key end
-    table.sort(keys)
-    for _, key in ipairs(keys) do add(key .. " = " .. tostring(State.settings[key])) end
+    for _, key in ipairs(State.SortedSettingKeys()) do add(key .. " = " .. tostring(State.settings[key])) end
     add("")
     add("== Game state ==")
     local player = Game.Player()
@@ -61,12 +58,8 @@ function BugReport.Write()
     add("== Last log lines ==")
     for _, line in ipairs(Log.RecentLines()) do add(line) end
 
-    local ok = pcall(function()
-        local file = assert(io.open(BugReport.FILE, "w"))
-        file:write(table.concat(lines, "\n"), "\n")
-        file:close()
-    end)
-    Log.Info(ok and ("bug report written: " .. BugReport.FILE) or ("could not write " .. BugReport.FILE))
+    local ok = Paths.WriteFile(REPORT_FILE, table.concat(lines, "\n") .. "\n")
+    Log.Info(ok and ("bug report written: " .. REPORT_FILE) or ("could not write " .. REPORT_FILE))
     State.status = ok and "Saved ValorianSheet-BugReport.txt in the mod folder" or "Could not write the bug report"
 end
 

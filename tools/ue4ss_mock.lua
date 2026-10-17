@@ -1,7 +1,7 @@
 -- Stand-ins for the UE4SS Lua API, for tools/smoke_test.py.
 -- Every object is a "mock": always valid, any property or method returns another mock, so the mod's
--- code paths run without the game. Values that must be real (class names, the player's pawn) are set
--- explicitly. This catches wiring and load errors, not game behaviour.
+-- code paths run without the game. Values that must be real (class names, the player's pawn, his
+-- location) are set explicitly. This catches wiring and load errors, not game behaviour.
 
 local Mock = {}
 local nextAddress = 1000
@@ -22,7 +22,6 @@ local function newMock(className)
         ForEach = function() end,
         GetArrayNum = function() return 0 end,
         ToString = function() return fields.__className end,
-        type = function() return "UObject" end,
         K2_GetActorLocation = function() return { X = 100.0, Y = 200.0, Z = 300.0 } end,
         GetControlRotation = function() return { Pitch = 0.0, Yaw = 90.0, Roll = 0.0 } end,
     }
@@ -37,7 +36,6 @@ local function newMock(className)
     })
     return mock
 end
-Mock.new = newMock
 
 -- The world the mod sees: a controller whose pawn is William.
 Mock.controller = newMock("BP_PlayerController_C")
@@ -45,7 +43,6 @@ Mock.controller.Pawn = newMock("BP_PlayerCharacter_C")
 Mock.worldReady = false   -- false: main menu (no player controller found)
 
 Mock.keyBinds = {}
-Mock.hooks = {}
 Mock.loop = nil
 Mock.printed = {}
 
@@ -55,17 +52,15 @@ function FindAllOf(className)
     end
     return nil
 end
-function FindFirstOf() return nil end
 function StaticFindObject(path) return newMock(path:match("([%w_]+)$") or "Static") end
-function StaticConstructObject(class, outer, name) return newMock("Constructed") end
+function StaticConstructObject() return newMock("Constructed") end
 function LoadAsset() end
 function FName(text) return { ToString = function() return text end } end
 function FText(text) return text end
-function CreateInvalidObject() return nil end
 function RegisterKeyBind(key, callback) Mock.keyBinds[key] = callback end
-function RegisterHook(path, pre, post) Mock.hooks[#Mock.hooks + 1] = path end
+function RegisterHook() end
 function RegisterLoadMapPreHook(callback) Mock.loadMap = callback end
-function LoopInGameThreadWithDelay(delay, fn) Mock.loop = fn return 1 end
+function LoopInGameThreadWithDelay(_, fn) Mock.loop = fn return 1 end
 function print(text) Mock.printed[#Mock.printed + 1] = text end
 
 Key = setmetatable({}, { __index = function(_, name) return name end })

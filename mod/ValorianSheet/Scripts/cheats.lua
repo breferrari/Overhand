@@ -1,13 +1,13 @@
 -- ValorianSheet / cheats.lua
--- Runs every feature module once per tick, and resets them when the world changes.
--- The features live in features/; each has a Tick (apply State.settings) and a Reset (forget
--- everything that belonged to the old world).
+-- Runs every feature module once per tick, and resets the world state when William changes (a new
+-- save, a map change, a respawn). Feature modules register their own per-world reset with
+-- Unreal.OnWorldReset; Unreal.ResetWorld runs them all.
 
 local Unreal = require("lib.unreal")
 local Log = require("lib.log")
-local Override = require("lib.override")
 local Game = require("game")
 local State = require("state")
+local Settings = require("settings")
 local Health = require("features.health")
 local Movement = require("features.movement")
 local Combat = require("features.combat")
@@ -19,28 +19,21 @@ local SavedValues = require("features.saved_values")
 
 local Cheats = {}
 
-local clock = State.clock
-
 local session = {
     readyAt = 0,                  -- nothing is applied before then (the world is still loading)
-    playerAddress = nil,          -- the William the state below belongs to
+    playerAddress = nil,          -- the William the per-world state belongs to
     savedValuesChecked = false,
     brokenWeaponsChecked = false,
 }
 
-local function resetForNewWorld()
-    Unreal.ResetCache()
-    Health.Reset()
-    Movement.Reset()
-    Combat.Reset()
-    Resources.Reset()
-    Buffs.Reset()
+Unreal.OnWorldReset(function()
     session.savedValuesChecked = false
     session.brokenWeaponsChecked = false
-end
+end)
 
 function Cheats.Tick()
-    if clock() < session.readyAt then return end
+    if os.clock() < session.readyAt then return end
+    Game.BeginTick()
     local player = Game.Player()
     if not player then
         State.status = "Waiting for a loaded save..."
@@ -49,10 +42,10 @@ function Cheats.Tick()
     end
     local address = Unreal.AddressOf(player)
     if address ~= session.playerAddress then
-        session.playerAddress = address
         Log.Info("player found")
-        resetForNewWorld()
-        session.readyAt = clock() + 2
+        Unreal.ResetWorld()
+        session.playerAddress = address
+        session.readyAt = os.clock() + 2
         State.status = "Ready"
         return
     end
@@ -71,30 +64,24 @@ function Cheats.Tick()
     Movement.Tick()
     Combat.Tick()
     Buffs.Tick()
-    Override.FlushLedger()
 end
 
+-- A map is loading: wait for it. The new William resets the world state when he appears (his
+-- address differs), which is the single place the reset happens.
 function Cheats.OnWorldChange(reason)
     Log.Debug("world change: " .. tostring(reason))
-    resetForNewWorld()
-    session.readyAt = clock() + 3
+    session.playerAddress = nil
+    session.readyAt = os.clock() + 3
 end
 
--- Every setting back to vanilla (the features restore the game's values on their next tick).
+-- Every cheat back to vanilla (the features restore the game's values on their next tick).
 function Cheats.TurnEverythingOff()
-    for key, value in pairs(State.defaults) do State.settings[key] = value end
-    Log.Info("everything turned off")
-end
-
--- Wraps a menu action that needs a loaded save.
-function Cheats.RequiresSave(action)
-    return function(...)
-        if not Game.Player() then
-            State.status = "Load a save first"
-            return
-        end
-        return action(...)
+    for key, value in pairs(State.defaults) do
+        if not State.NOT_A_CHEAT[key] then State.settings[key] = value end
     end
+    Settings.MarkDirty()
+    State.status = "Everything is back to vanilla"
+    Log.Info("everything turned off")
 end
 
 return Cheats

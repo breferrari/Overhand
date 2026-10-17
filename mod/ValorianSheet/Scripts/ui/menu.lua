@@ -8,12 +8,13 @@
 --
 -- The menu content is defined in ui/sheet.lua; this file only knows the item kinds.
 -- Everything runs on the game thread from Menu.Tick; while the menu is closed a tick only looks at
--- the key queue.
+-- the key queue. A refresh only touches widgets whose text or colour changed.
 
 local Unreal = require("lib.unreal")
 local Log = require("lib.log")
 local Game = require("game")
 local State = require("state")
+local Settings = require("settings")
 local Widgets = require("ui.widgets")
 local Input = require("ui.input")
 local GameMenus = require("ui.game_menus")
@@ -22,9 +23,8 @@ local Menu = {}
 
 local COLORS = Widgets.COLORS
 local try, isValid = Unreal.Try, Unreal.IsValid
-local clock = State.clock
 
-Menu.TITLE = "VALORIAN SHEET"
+local TITLE = "VALORIAN SHEET"
 local HINT = "Up/Down select   Left/Right change   Enter use   Q/E tab   F6 close"
 local MIN_WIDTH = 460
 local SLIDER_WIDTH = 150
@@ -34,13 +34,11 @@ local REFERENCE_HEIGHT = 1080
 local REFRESH_INTERVAL = 0.25
 local GAME_MENU_CHECK_INTERVAL = 0.5
 
--- Called with (key, value) whenever a row bound to a settings key changes.
-Menu.onSettingChanged = nil
-
 local tabs = {}   -- { title, items }
 local view = {
     open = false,
     tabIndex = 1,
+    shownTabIndex = nil,      -- the tab the widgets currently show
     selectedByTab = {},       -- tab index -> item index
     widgets = nil,            -- built on the first open
     pendingConfirm = nil,     -- the action waiting for its second Enter
@@ -57,7 +55,8 @@ local function isSelectable(item)
     return item.kind == "toggle" or item.kind == "choice" or item.kind == "action"
 end
 
--- A settings key (string) becomes a get/set pair on State.settings.
+-- A settings key (string) becomes a get/set pair on State.settings that logs and saves changes;
+-- an accessor table ({ get, set }, e.g. from Menu.Value) is used as it is.
 local function accessorFor(keyOrAccessor)
     if type(keyOrAccessor) == "table" then return keyOrAccessor end
     local key = keyOrAccessor
@@ -65,9 +64,16 @@ local function accessorFor(keyOrAccessor)
         get = function() return State.settings[key] end,
         set = function(value)
             State.settings[key] = value
-            if Menu.onSettingChanged then Menu.onSettingChanged(key, value) end
+            Log.Info("menu: " .. key .. " -> " .. tostring(value))
+            Settings.MarkDirty()
         end,
     }
+end
+
+-- A value that only lives in the menu (not saved), e.g. the selected teleport slot.
+function Menu.Value(initial)
+    local value = initial
+    return { get = function() return value end, set = function(newValue) value = newValue end }
 end
 
 function Menu.Section(title) return { kind = "section", label = title } end
@@ -75,9 +81,11 @@ function Menu.Section(title) return { kind = "section", label = title } end
 -- A line of text; textOf() is read on every refresh.
 function Menu.Info(textOf) return { kind = "info", text = textOf } end
 
--- confirmPrompt (optional): the action needs a second Enter; the prompt goes to the status line.
-function Menu.Action(label, run, confirmPrompt)
-    return { kind = "action", label = label, run = run, confirmPrompt = confirmPrompt }
+-- options.confirm: a prompt; the action then needs a second Enter.
+-- options.anytime: runs without a loaded save (by default an action needs one, and says so).
+function Menu.Action(label, run, options)
+    options = options or {}
+    return { kind = "action", label = label, run = run, confirmPrompt = options.confirm, needsSave = not options.anytime }
 end
 
 function Menu.Toggle(label, keyOrAccessor)
@@ -85,8 +93,9 @@ function Menu.Toggle(label, keyOrAccessor)
     return { kind = "toggle", label = label, get = accessor.get, set = accessor.set }
 end
 
--- options: a list of { label, value }, or a function returning one (read on every refresh).
--- display.slider adds a slider for the mouse (long lists); display.wrap = false stops at the ends.
+-- options: a list of { label, value }, or a function returning one (read on every refresh, so it
+-- should cache). display.slider adds a slider for the mouse (long lists); display.wrap = false stops
+-- at the ends.
 function Menu.Choice(label, options, keyOrAccessor, display)
     local accessor = accessorFor(keyOrAccessor)
     display = display or {}
@@ -153,8 +162,7 @@ end
 
 local function moveSelection(direction)
     local tab = tabs[view.tabIndex]
-    local selectable = {}
-    local position = 1
+    local selectable, position = {}, 1
     for index, item in ipairs(tab.items) do
         if isSelectable(item) then
             selectable[#selectable + 1] = index
@@ -162,8 +170,7 @@ local function moveSelection(direction)
         end
     end
     if #selectable == 0 then return end
-    position = (position - 1 + direction) % #selectable + 1
-    view.selectedByTab[view.tabIndex] = selectable[position]
+    view.selectedByTab[view.tabIndex] = selectable[(position - 1 + direction) % #selectable + 1]
 end
 
 local function changeValue(direction)
@@ -189,24 +196,25 @@ local function activate()
     if not item then return end
     if item.kind == "toggle" then
         changeValue(1)
-    elseif item.kind == "action" then
-        if item.confirmPrompt and view.pendingConfirm ~= item then
-            view.pendingConfirm = item
-            State.status = item.confirmPrompt .. " Press Enter again to confirm."
-            return
-        end
-        view.pendingConfirm = nil
-        Log.Info("menu: " .. item.label)
-        Log.Guarded("action " .. item.label, item.run)
+        return
     end
+    if item.kind ~= "action" then return end
+    if item.needsSave and not Game.Player() then
+        State.status = "Load a save first"
+        return
+    end
+    if item.confirmPrompt and view.pendingConfirm ~= item then
+        view.pendingConfirm = item
+        State.status = item.confirmPrompt .. " Press Enter again to confirm."
+        return
+    end
+    view.pendingConfirm = nil
+    Log.Info("menu: " .. item.label)
+    Log.Guarded("action " .. item.label, item.run)
 end
 
 local function switchTab(direction)
-    if #tabs == 0 then return end
-    local pages = view.widgets and view.widgets.pages
-    if pages then Widgets.SetVisible(pages[view.tabIndex].box, false) end
-    view.tabIndex = (view.tabIndex - 1 + direction) % #tabs + 1
-    if pages then Widgets.SetVisible(pages[view.tabIndex].box, true) end
+    if #tabs > 0 then view.tabIndex = (view.tabIndex - 1 + direction) % #tabs + 1 end
 end
 
 -- ---------------------------------------------------------------------------
@@ -227,25 +235,23 @@ local function buildRow(tree, page, name, item)
 
     if item.kind == "choice" and item.slider then
         local options = optionsOf(item)
-        local count = math.max(#options, 2)
-        local box, slider = Widgets.Slider(tree, name .. "Slider", 1, count, 1, currentIndex(item, options) or 1, SLIDER_WIDTH)
+        local maximum = math.max(#options, 2)
+        local box, slider = Widgets.Slider(tree, name .. "Slider", 1, maximum, currentIndex(item, options) or 1, SLIDER_WIDTH)
         local sliderSlot = line:AddChild(box)
         try(function() sliderSlot:SetVerticalAlignment(2) end)
         Widgets.Pad(sliderSlot, 0, 0, 12, 0)
-        row.slider, row.sliderMaximum = slider, count
+        row.slider, row.sliderMaximum = slider, maximum
     end
 
     local value = Widgets.Text(tree, name .. "Value", "", 13, COLORS.value)
+    local valueWidget = value
     if item.kind ~= "action" then
-        local valueBox = Widgets.SizeBox(tree, name .. "ValueBox")
-        try(function() valueBox:SetMinDesiredWidth(VALUE_WIDTH) end)
-        valueBox:SetContent(value)
-        local valueSlot = line:AddChild(valueBox)
-        try(function() valueSlot:SetVerticalAlignment(2) end)
-    else
-        local valueSlot = line:AddChild(value)
-        try(function() valueSlot:SetVerticalAlignment(2) end)
+        valueWidget = Widgets.SizeBox(tree, name .. "ValueBox")
+        try(function() valueWidget:SetMinDesiredWidth(VALUE_WIDTH) end)
+        valueWidget:SetContent(value)
     end
+    local valueSlot = line:AddChild(valueWidget)
+    try(function() valueSlot:SetVerticalAlignment(2) end)
     row.value = value
 
     Widgets.Pad(page:AddChild(border), 0, 1, 0, 1)
@@ -269,7 +275,7 @@ local function buildPage(tree, column, tabIndex, tab)
         end
     end
     column:AddChild(page)
-    Widgets.SetVisible(page, tabIndex == view.tabIndex)
+    Widgets.SetVisible(page, false)
     return { box = page, rows = rows }
 end
 
@@ -277,7 +283,7 @@ local function build(controller)
     Widgets.StartBuild()
     local widgetLibrary = Game.WidgetLibrary()
     local root = try(function()
-        return widgetLibrary:Create(controller, StaticFindObject("/Script/UMG.UserWidget"), controller)
+        return widgetLibrary:Create(controller, Unreal.Static("/Script/UMG.UserWidget"), controller)
     end)
     if not isValid(root) then root = Widgets.Construct("/Script/UMG.UserWidget", controller, "Root") end
     local tree = Widgets.Construct("/Script/UMG.WidgetTree", root, "Tree")
@@ -297,7 +303,7 @@ local function build(controller)
     local column = Widgets.VerticalBox(tree, "Column")
     widthBox:SetContent(column)
 
-    Widgets.Pad(column:AddChild(Widgets.Text(tree, "Title", Menu.TITLE, 20, COLORS.title)), 0, 0, 0, 4)
+    Widgets.Pad(column:AddChild(Widgets.Text(tree, "Title", TITLE, 20, COLORS.title)), 0, 0, 0, 4)
     local tabRow = Widgets.HorizontalBox(tree, "Tabs")
     local tabLabels = {}
     for index, tab in ipairs(tabs) do
@@ -318,59 +324,84 @@ local function build(controller)
 
     try(function() root:AddToViewport(1000) end)
     view.widgets = { root = root, frame = frame, frameSlot = frameSlot, tabLabels = tabLabels, pages = pages, status = status }
+    view.shownTabIndex = nil
 end
 
 -- The menu is laid out for 1080p and scaled to the viewport (UMG's own DPI scale divided out).
 local function applyScale(controller)
     local layout = Unreal.Static("/Script/UMG.Default__WidgetLayoutLibrary")
-    local size = try(function() return layout:GetViewportSize(controller) end)
-    local dpiScale = try(function() return layout:GetViewportScale(controller) end)
-    local height = size and try(function() return size.Y end)
+    local height = Unreal.TryNumber(function() return layout:GetViewportSize(controller).Y end)
+    local dpiScale = Unreal.TryNumber(function() return layout:GetViewportScale(controller) end)
     local scale = 1
-    if type(height) == "number" and height > 0 and type(dpiScale) == "number" and dpiScale > 0 then
-        scale = (height / REFERENCE_HEIGHT) / dpiScale
-    end
+    if height and height > 0 and dpiScale and dpiScale > 0 then scale = (height / REFERENCE_HEIGHT) / dpiScale end
     local widgets = view.widgets
     try(function() widgets.frame:SetRenderTransformPivot({ X = 0.0, Y = 0.0 }) end)
     try(function() widgets.frame:SetRenderScale({ X = scale, Y = scale }) end)
     try(function() widgets.frameSlot:SetPosition({ X = POSITION.X * scale, Y = POSITION.Y * scale }) end)
 end
 
+local function showTab()
+    local widgets = view.widgets
+    if view.shownTabIndex == view.tabIndex then return end
+    if view.shownTabIndex then
+        Widgets.SetVisible(widgets.pages[view.shownTabIndex].box, false)
+        Widgets.SetTextColor(widgets.tabLabels[view.shownTabIndex], COLORS.muted)
+    end
+    Widgets.SetVisible(widgets.pages[view.tabIndex].box, true)
+    Widgets.SetTextColor(widgets.tabLabels[view.tabIndex], COLORS.title)
+    view.shownTabIndex = view.tabIndex
+end
+
+-- Writes only what changed since the row was last drawn.
+local function drawRow(row, item, isSelected)
+    local text = valueText(item, isSelected)
+    if text ~= row.shownText then
+        Widgets.SetText(row.value, text)
+        row.shownText = text
+    end
+    if isSelected ~= row.shownSelected then
+        try(function() row.border:SetBrushColor(isSelected and COLORS.rowSelected or COLORS.rowIdle) end)
+        Widgets.SetTextColor(row.label, isSelected and COLORS.title or COLORS.label)
+        Widgets.SetTextColor(row.value, isSelected and COLORS.title or COLORS.value)
+        row.shownSelected = isSelected
+    end
+    if row.slider then
+        local options = optionsOf(item)
+        local maximum = math.max(#options, 2)
+        if maximum ~= row.sliderMaximum then
+            try(function() row.slider:SetMaxValue(maximum) end)
+            row.sliderMaximum = maximum
+        end
+        local index = currentIndex(item, options) or 1
+        if index ~= row.sliderIndex then
+            try(function() row.slider:SetValue(index) end)
+            row.sliderIndex = index
+        end
+    end
+end
+
 local function refresh()
     local widgets = view.widgets
     if not widgets then return end
-    for index, label in ipairs(widgets.tabLabels) do
-        Widgets.SetTextColor(label, index == view.tabIndex and COLORS.title or COLORS.muted)
-    end
+    showTab()
     local tab, page = tabs[view.tabIndex], widgets.pages[view.tabIndex]
     local _, selectedIndex = selected()
     for index, item in ipairs(tab.items) do
         local row = page.rows[index]
         if row and row.info then
-            Widgets.SetText(row.info, item.text())
-        elseif row then
-            local isSelected = index == selectedIndex
-            Widgets.SetText(row.value, valueText(item, isSelected))
-            try(function() row.border:SetBrushColor(isSelected and COLORS.rowSelected or COLORS.rowIdle) end)
-            Widgets.SetTextColor(row.label, isSelected and COLORS.title or COLORS.label)
-            Widgets.SetTextColor(row.value, isSelected and COLORS.title or COLORS.value)
-            if row.slider then
-                local options = optionsOf(item)
-                local maximum = math.max(#options, 2)
-                if maximum ~= row.sliderMaximum then
-                    try(function() row.slider:SetMaxValue(maximum) end)
-                    row.sliderMaximum = maximum
-                end
-                row.sliderIndex = currentIndex(item, options) or 1
-                local shown = Widgets.SliderValue(row.slider)
-                if not shown or math.abs(shown - row.sliderIndex) > 0.01 then
-                    try(function() row.slider:SetValue(row.sliderIndex) end)
-                end
+            local text = item.text()
+            if text ~= row.shownText then
+                Widgets.SetText(row.info, text)
+                row.shownText = text
             end
+        elseif row then
+            drawRow(row, item, index == selectedIndex)
         end
     end
-    Widgets.SetText(widgets.status, State.status)
-    view.shownStatus = State.status
+    if State.status ~= view.shownStatus then
+        Widgets.SetText(widgets.status, State.status)
+        view.shownStatus = State.status
+    end
 end
 
 -- A slider moved with the mouse picks that option. Returns true when something changed.
@@ -380,10 +411,10 @@ local function readSliders()
     for index, item in ipairs(tab.items) do
         local row = page.rows[index]
         local raw = row and row.slider and Widgets.SliderValue(row.slider)
-        if raw then
-            local optionIndex = math.floor(raw + 0.5)
+        local optionIndex = raw and math.floor(raw + 0.5)
+        if optionIndex and optionIndex ~= row.sliderIndex then
             local option = optionsOf(item)[optionIndex]
-            if option and optionIndex ~= row.sliderIndex then
+            if option then
                 item.set(option.value)
                 row.sliderIndex = optionIndex
                 view.selectedByTab[view.tabIndex] = index
@@ -398,8 +429,7 @@ end
 -- Open / close
 -- ---------------------------------------------------------------------------
 
-function Menu.Open()
-    if view.open then return end
+local function open()
     local controller = Game.Controller()
     if not controller then
         Log.Info("menu: no player controller yet")
@@ -420,12 +450,12 @@ function Menu.Open()
     Input.BlockGame(controller)
     view.open = true
     view.pendingConfirm = nil
-    view.nextGameMenuCheckAt = clock() + GAME_MENU_CHECK_INTERVAL
+    view.nextGameMenuCheckAt = os.clock() + GAME_MENU_CHECK_INTERVAL
     refresh()
 end
 
 -- handOverTo: a game menu that opened on top of ours (it gets the cursor).
-function Menu.Close(handOverTo)
+local function close(handOverTo)
     if not view.open then return end
     view.open = false
     view.pendingConfirm = nil
@@ -441,12 +471,12 @@ local COMMANDS = {
     enter = activate,
     previousTab = function() switchTab(-1) end,
     nextTab = function() switchTab(1) end,
-    close = function() Menu.Close() end,
+    close = function() close() end,
 }
 
 local function handleCommand(command)
     if command == "toggle" then
-        if view.open then Menu.Close() else Menu.Open() end
+        if view.open then close() else open() end
         return
     end
     if not view.open then return end
@@ -472,31 +502,24 @@ function Menu.Tick()
         Log.Guarded("menu command " .. command, handleCommand, command)
     end
     if not view.open then return end
+    -- the widgets die with the world (map change): the next open builds new ones
     if not (view.widgets and isValid(view.widgets.root)) then
         view.open, view.widgets = false, nil
         Input.Forget()
         return
     end
-    if clock() >= view.nextGameMenuCheckAt then
-        view.nextGameMenuCheckAt = clock() + GAME_MENU_CHECK_INTERVAL
+    if os.clock() >= view.nextGameMenuCheckAt then
+        view.nextGameMenuCheckAt = os.clock() + GAME_MENU_CHECK_INTERVAL
         local gameMenu = GameMenus.FindOpenKnown()
         if gameMenu or GameMenus.IsGamePaused() then
-            Menu.Close(gameMenu)
+            close(gameMenu)
             return
         end
     end
-    local slidersChanged = readSliders()
-    if slidersChanged or State.status ~= view.shownStatus or clock() >= view.nextRefreshAt then
-        view.nextRefreshAt = clock() + REFRESH_INTERVAL
+    if readSliders() or State.status ~= view.shownStatus or os.clock() >= view.nextRefreshAt then
+        view.nextRefreshAt = os.clock() + REFRESH_INTERVAL
         refresh()
     end
-end
-
--- After a map change the widgets and the controller belonged to the old world.
-function Menu.OnWorldChange()
-    view.open, view.widgets, view.pendingConfirm = false, nil, nil
-    Input.Forget()
-    GameMenus.Reset()
 end
 
 return Menu

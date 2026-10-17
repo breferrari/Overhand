@@ -7,11 +7,11 @@ local Log = require("lib.log")
 local Game = require("game")
 local State = require("state")
 local Health = require("features.health")
+local Hud = require("features.hud")
 
 local Resources = {}
 
 local try, isValid = Unreal.Try, Unreal.IsValid
-local clock = State.clock
 
 -- ---------------------------------------------------------------------------
 -- Flasks and ammo
@@ -32,13 +32,10 @@ function Resources.FillAmmo()
         if Game.FillAttribute(rangedSet, ammoType .. "Ammo", "Max" .. ammoType .. "Ammo") then changed = true end
         if Game.FillAttribute(rangedSet, ammoType .. "AmmoInClip", "Max" .. ammoType .. "AmmoInClip") then changed = true end
     end
-    -- Values written directly do not reach the HUD by themselves: tell the ammo display.
+    -- Values written directly do not reach the HUD by themselves.
     if changed then
-        local notifier = Game.AttributesNotifier()
-        if notifier then
-            try(function() notifier:RequestWeaponRefresh() end)
-            try(function() notifier:RequestTokenRefresh() end)
-        end
+        Hud.RefreshWeapons()
+        Hud.RefreshTokens()
     end
 end
 
@@ -49,8 +46,8 @@ end
 local nextCooldownResetAt = 0
 
 local function resetItemCooldowns()
-    if clock() < nextCooldownResetAt then return end
-    nextCooldownResetAt = clock() + 0.25
+    if os.clock() < nextCooldownResetAt then return end
+    nextCooldownResetAt = os.clock() + 0.25
     local inventory, player = Game.Inventory(), Game.Player()
     if inventory and player then
         try(function() inventory:TrySetAllConsumableInventoryItemsCooldown(player, 0.0) end)
@@ -67,8 +64,8 @@ local function pickUpDeathmark()
     local deathmark = try(function() return player.DeathmarkRef end)
     if not isValid(deathmark) then return end
     local address = Unreal.AddressOf(deathmark)
-    if deathmarkRetryAt[address] and clock() < deathmarkRetryAt[address] then return end
-    deathmarkRetryAt[address] = clock() + 3
+    if os.clock() < (deathmarkRetryAt[address] or 0) then return end
+    deathmarkRetryAt[address] = os.clock() + 3
     if try(function() deathmark:ForcePickup() return true end) then
         Log.Info("deathmark picked up (catalysts kept)")
     end
@@ -77,48 +74,27 @@ end
 -- ---------------------------------------------------------------------------
 -- Consumables: the game's item database lists every consumable (grenades, syringes, potions, ...).
 -- We watch how many William carries and give back whatever was used up. (Hooks on the "use item"
--- functions do not work: the game calls them from C++.)
+-- functions do not work: the game calls them from C++.) The same poll keeps the most he carried
+-- of each this session, which Refill Everything puts back.
 -- ---------------------------------------------------------------------------
 
 local consumables = {
-    tags = nil,            -- every consumable item tag, from the item database
-    lastCounts = {},       -- tag -> count at the last poll
+    tags = nil,            -- every consumable item tag, from the item database (built once)
+    lastCounts = {},       -- tag -> count at the last poll (while Infinite Consumables is on)
     unrefillable = {},     -- tags whose give-back did not stick
     verifyNextPoll = {},   -- tags given back on the last poll
-    peakCounts = {},       -- tag -> the most carried this session (for Refill Everything)
+    peakCounts = {},       -- tag -> the most carried this session
     nextPollAt = 0,
-    nextPeakAt = 0,
 }
 
--- The database maps a category (Items.Consumable.Grenade) to its real items
--- (Items.Consumable.Grenade.Regular, ...Oil). We want the real items.
 function Resources.ConsumableTags()
     if consumables.tags then return consumables.tags end
-    local inventory = Game.Inventory()
-    local database = inventory and try(function() return inventory.InventoryDatabaseAsset end)
-    if not isValid(database) then return nil end
-    local tags, categoryCount = {}, 0
-    try(function()
-        database.ConsumableItemsMap:ForEach(function(categoryKey, category)
-            categoryCount = categoryCount + 1
-            local before = #tags
-            try(function()
-                category:get().ItemMap:ForEach(function(itemKey)
-                    local tag = try(function() return itemKey:get().TagName:ToString() end)
-                    if tag and tag ~= "None" then tags[#tags + 1] = tag end
-                end)
-            end)
-            if #tags == before then
-                -- a category without sub items: use the category tag itself
-                local tag = try(function() return categoryKey:get().TagName:ToString() end)
-                if tag and tag ~= "None" then tags[#tags + 1] = tag end
-            end
-        end)
-    end)
+    local tags = {}
+    Game.ForEachDatabaseItem("ConsumableItemsMap", function(tagName) tags[#tags + 1] = tagName end)
     if #tags == 0 then return nil end
     table.sort(tags)
     consumables.tags = tags
-    Log.Info("consumables: " .. #tags .. " items in " .. categoryCount .. " categories")
+    Log.Info("consumables: " .. #tags .. " items")
     return tags
 end
 
@@ -128,48 +104,44 @@ function Resources.StartNewCount(itemTag)
     if itemTag then consumables.peakCounts[itemTag] = nil end
 end
 
-local function giveBackUsedConsumables()
-    if clock() < consumables.nextPollAt then return end
-    consumables.nextPollAt = clock() + 0.25
+local function giveBack(tag, count)
+    local lastCount = consumables.lastCounts[tag]
+    if consumables.verifyNextPoll[tag] then
+        -- we gave this one back on the last poll: did it arrive?
+        consumables.verifyNextPoll[tag] = nil
+        if lastCount and count < lastCount then
+            consumables.unrefillable[tag] = true
+            Log.Info("consumable " .. tag .. ": give back did not stick (" .. count .. "/" .. lastCount .. "), skipping it")
+        end
+        consumables.lastCounts[tag] = count
+    elseif lastCount and count < lastCount and not consumables.unrefillable[tag] then
+        local used = lastCount - count
+        if Game.AddItem(tag, used) then
+            Log.Debug("consumable " .. tag .. " +" .. used .. " (given back)")
+            consumables.verifyNextPoll[tag] = true
+        else
+            consumables.unrefillable[tag] = true
+            Log.Info("consumable " .. tag .. ": AddInventoryItem failed, skipping it")
+        end
+    elseif not lastCount or count > lastCount then
+        consumables.lastCounts[tag] = count
+    end
+end
+
+-- Every 0.25 s while Infinite Consumables is on, every 1 s otherwise (peak counts only).
+local function pollConsumables()
+    if os.clock() < consumables.nextPollAt then return end
+    local infinite = State.settings.infiniteConsumables == true
+    consumables.nextPollAt = os.clock() + (infinite and 0.25 or 1)
+    if not infinite then consumables.lastCounts = {} end
     local tags = Resources.ConsumableTags()
     if not tags then return end
     for _, tag in ipairs(tags) do
         local count = Game.ItemCount(tag)
         if count then
-            local lastCount = consumables.lastCounts[tag]
-            if consumables.verifyNextPoll[tag] then
-                -- we gave this one back on the last poll: did it arrive?
-                consumables.verifyNextPoll[tag] = nil
-                if lastCount and count < lastCount then
-                    consumables.unrefillable[tag] = true
-                    Log.Info("consumable " .. tag .. ": give back did not stick (" .. count .. "/" .. lastCount .. "), skipping it")
-                end
-                consumables.lastCounts[tag] = count
-            elseif lastCount and count < lastCount and not consumables.unrefillable[tag] then
-                local used = lastCount - count
-                if Game.AddItem(tag, used) then
-                    Log.Debug("consumable " .. tag .. " +" .. used .. " (given back)")
-                    consumables.verifyNextPoll[tag] = true
-                else
-                    consumables.unrefillable[tag] = true
-                    Log.Info("consumable " .. tag .. ": AddInventoryItem failed, skipping it")
-                end
-            elseif not lastCount or count > lastCount then
-                consumables.lastCounts[tag] = count
-            end
+            if count > (consumables.peakCounts[tag] or 0) then consumables.peakCounts[tag] = count end
+            if infinite then giveBack(tag, count) end
         end
-    end
-end
-
--- Once a second: remember the most William carried of every consumable.
-local function trackPeakCounts()
-    if clock() < consumables.nextPeakAt then return end
-    consumables.nextPeakAt = clock() + 1
-    local tags = Resources.ConsumableTags()
-    if not tags then return end
-    for _, tag in ipairs(tags) do
-        local count = Game.ItemCount(tag)
-        if count and count > (consumables.peakCounts[tag] or 0) then consumables.peakCounts[tag] = count end
     end
 end
 
@@ -226,17 +198,12 @@ function Resources.Tick()
     if settings.infiniteAmmo then Resources.FillAmmo() end
     if settings.noItemCooldowns then resetItemCooldowns() end
     if settings.keepCatalysts then pickUpDeathmark() end
-    if settings.infiniteConsumables then
-        giveBackUsedConsumables()
-    else
-        consumables.lastCounts = {}
-    end
-    trackPeakCounts()
+    pollConsumables()
 end
 
-function Resources.Reset()
+Unreal.OnWorldReset(function()
     deathmarkRetryAt = {}
     consumables.lastCounts, consumables.unrefillable, consumables.verifyNextPoll = {}, {}, {}
-end
+end)
 
 return Resources

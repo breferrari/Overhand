@@ -5,6 +5,7 @@ local Unreal = require("lib.unreal")
 local Log = require("lib.log")
 local Game = require("game")
 local State = require("state")
+local Hud = require("features.hud")
 local Resources = require("features.resources")
 local DevActions = require("features.dev_actions")
 
@@ -12,21 +13,16 @@ local Give = {}
 
 local try, isValid = Unreal.Try, Unreal.IsValid
 
-local function tagNamesOf(tagContainer)
-    local names = {}
-    try(function()
-        tagContainer.GameplayTags:ForEach(function(_, element)
-            local name = try(function() return element:get().TagName:ToString() end)
-            if name and name ~= "None" then names[#names + 1] = name end
-        end)
-    end)
-    return names
+-- The upgrade materials the developers' cheat manager lists.
+local function upgradeMaterialTags()
+    local cheatManager = Game.CheatManager()
+    local materials = cheatManager and try(function() return cheatManager.UpgradeMaterials end)
+    return materials and Game.TagNamesIn(materials) or {}
 end
 
 function Give.Catalysts(amount)
     local combatUtils = Game.CombatUtils()
-    if not isValid(combatUtils) then return end
-    if try(function() combatUtils:AddExperiencePointsToPlayer(amount) return true end) then
+    if isValid(combatUtils) and try(function() combatUtils:AddExperiencePointsToPlayer(amount) return true end) then
         Log.Info("added " .. amount .. " catalysts")
         State.status = "Added " .. amount .. " catalysts"
     else
@@ -34,15 +30,9 @@ function Give.Catalysts(amount)
     end
 end
 
--- The upgrade materials the developers' cheat manager lists, `amount` of each.
 function Give.UpgradeMaterials(amount)
-    local cheatManager = Game.CheatManager()
-    if not cheatManager then
-        State.status = "Cheat manager not found"
-        return
-    end
     local given = 0
-    for _, tag in ipairs(tagNamesOf(try(function() return cheatManager.UpgradeMaterials end))) do
+    for _, tag in ipairs(upgradeMaterialTags()) do
         if Game.AddItem(tag, amount) then given = given + 1 end
     end
     State.status = given > 0 and ("Added " .. amount .. " of " .. given .. " materials") or "No materials found"
@@ -106,40 +96,21 @@ local function inGameName(itemProperties)
     return name
 end
 
-local function addEntry(list, seenTags, tag, itemProperties)
-    if not tag or tag == "None" or seenTags[tag] then return end
-    seenTags[tag] = true
-    list[#list + 1] = { label = (itemProperties and inGameName(itemProperties)) or readableTag(tag), tag = tag }
-end
-
 -- Built once a save is loaded (nil before).
 function Give.Catalog()
     if catalog then return catalog end
-    local inventory = Game.Inventory()
-    local database = inventory and try(function() return inventory.InventoryDatabaseAsset end)
-    if not isValid(database) then return nil end
     local result, total = {}, 0
     for _, category in ipairs(Give.CATEGORIES) do
         local list, seenTags = {}, {}
-        try(function()
-            database[category.databaseMap]:ForEach(function(categoryKey, categoryItems)
-                local before = #list
-                try(function()
-                    categoryItems:get().ItemMap:ForEach(function(itemKey, itemProperties)
-                        addEntry(list, seenTags, try(function() return itemKey:get().TagName:ToString() end),
-                            try(function() return itemProperties:get() end))
-                    end)
-                end)
-                if #list == before then
-                    addEntry(list, seenTags, try(function() return categoryKey:get().TagName:ToString() end), nil)
-                end
-            end)
-        end)
+        local function add(tag, itemProperties)
+            if seenTags[tag] then return end
+            seenTags[tag] = true
+            list[#list + 1] = { label = (itemProperties and inGameName(itemProperties)) or readableTag(tag), tag = tag }
+        end
+        Game.ForEachDatabaseItem(category.databaseMap, add)
         if category.label == "Materials" then
             -- the materials the cheat manager lists, in case the database misses some
-            local cheatManager = Game.CheatManager()
-            local materials = cheatManager and try(function() return cheatManager.UpgradeMaterials end)
-            for _, tag in ipairs(materials and tagNamesOf(materials) or {}) do addEntry(list, seenTags, tag, nil) end
+            for _, tag in ipairs(upgradeMaterialTags()) do add(tag, nil) end
         end
         table.sort(list, function(a, b) return a.label:lower() < b.label:lower() end)
         result[category.label] = list
@@ -157,8 +128,6 @@ function Give.Item(entry, amount)
         State.status = "Pick an item first"
         return
     end
-    amount = math.floor(tonumber(amount) or 0)
-    if amount < 1 then return end
     local countBefore = Game.ItemCount(entry.tag)
     local ok = Game.AddItem(entry.tag, amount)
     Resources.StartNewCount(entry.tag)
@@ -202,7 +171,7 @@ end
 -- Returns true once the check could run (player and cheat manager present).
 function Give.RemoveBrokenWeapons()
     local player, cheatManager = Game.Player(), Game.CheatManager()
-    if not isValid(player) or not cheatManager then return false end
+    if not player or not cheatManager then return false end
     local brokenByAddress = {}
     for _, field in ipairs(BROKEN_WEAPON_FIELDS) do
         local weapon = try(function() return cheatManager[field] end)
@@ -247,8 +216,7 @@ function Give.RemoveBrokenWeapons()
         if isValid(pistol) then try(function() player:EquipRangedWeapon(pistol, false, true, true) end) end
     end
     if cleanedLists > 0 then
-        local notifier = Game.AttributesNotifier()
-        if notifier then try(function() notifier:RequestWeaponRefresh() end) end
+        Hud.RefreshWeapons()
         State.status = "Removed the broken Crystal Grenade from your weapon wheel"
     end
     return true

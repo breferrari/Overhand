@@ -5,11 +5,12 @@
 .DESCRIPTION
     Copies mod\ValorianSheet into <game>\ValorMortis\Binaries\Win64\ue4ss\Mods\ValorianSheet.
     Your settings.cfg and teleports.txt in the installed folder are kept.
-    If the Valor Mortis Cheat Menu is installed, it is switched off (its enabled.txt is renamed to
-    enabled.txt.disabled) so both menus never apply cheats at the same time; its folder stays, and
-    ValorianSheet imports its settings and teleports on the first start.
 
-    -Uninstall removes ValorianSheet and switches the Cheat Menu back on.
+    ValorianSheet replaces the Valor Mortis Cheat Menu and AeonGreyh's Passive Health Regen. If they
+    are installed they are switched off (enabled.txt renamed to enabled.txt.disabled) so nothing is
+    applied twice; their folders stay, and ValorianSheet imports their settings on the first start.
+
+    -Uninstall removes ValorianSheet and switches those mods back on.
 
 .EXAMPLE
     .\tools\install.ps1
@@ -29,12 +30,14 @@ if (-not (Test-Path $mods)) { throw "UE4SS Mods folder not found: $mods (is UE4S
 if (Get-Process -Name "ValorMortis*" -ErrorAction SilentlyContinue) { throw "Valor Mortis is running. Close it first." }
 
 $target = Join-Path $mods "ValorianSheet"
-$cheatMenuEnabled = Join-Path $mods "ValorCheatMenu\enabled.txt"
-$cheatMenuDisabled = "$cheatMenuEnabled.disabled"
+$replacedMods = @("ValorCheatMenu", "PassiveHealthRegen")
 
 if ($Uninstall) {
     if (Test-Path $target) { Remove-Item $target -Recurse -Force; "Removed $target" }
-    if (Test-Path $cheatMenuDisabled) { Rename-Item $cheatMenuDisabled "enabled.txt"; "Valor Mortis Cheat Menu switched back on" }
+    foreach ($name in $replacedMods) {
+        $disabled = Join-Path $mods "$name\enabled.txt.disabled"
+        if (Test-Path $disabled) { Rename-Item $disabled "enabled.txt"; "$name switched back on" }
+    }
     return
 }
 
@@ -42,7 +45,7 @@ $source = Join-Path $PSScriptRoot "..\mod\ValorianSheet" | Resolve-Path
 $keep = @("settings.cfg", "teleports.txt")
 
 if (Test-Path $target) {
-    # Replace the scripts, keep the player's files.
+    # Replace the scripts, keep the player's files and logs.
     Get-ChildItem $target -Force | Where-Object { $keep -notcontains $_.Name -and $_.Extension -notin ".log", ".old" } |
         Remove-Item -Recurse -Force
 }
@@ -50,7 +53,10 @@ New-Item -ItemType Directory $target -Force | Out-Null
 Copy-Item (Join-Path $source "*") $target -Recurse -Force
 "Installed to $target"
 
-if (Test-Path $cheatMenuEnabled) {
-    Rename-Item $cheatMenuEnabled "enabled.txt.disabled"
-    "Valor Mortis Cheat Menu switched off (settings will be imported on first start)"
+foreach ($name in $replacedMods) {
+    $enabled = Join-Path $mods "$name\enabled.txt"
+    if (Test-Path $enabled) {
+        Rename-Item $enabled "enabled.txt.disabled"
+        "$name switched off (its settings are imported on the first start)"
+    }
 }

@@ -9,28 +9,37 @@ local State = require("state")
 
 local Combat = {}
 
-local try, isValid, addressOf = Unreal.Try, Unreal.IsValid, Unreal.AddressOf
-local clock = State.clock
+local try, isValid = Unreal.Try, Unreal.IsValid
 
 -- ---------------------------------------------------------------------------
--- In a fight? The game's CombatSubsystem knows; checked at most 4 times a second. The subsystems
--- are kept (Game.Subsystem), so a check never searches.
+-- In a fight? The world's EnemyInfoSubsystem lists the enemies that are fighting William (the check
+-- AeonGreyh's Passive Health Regen uses). The subsystem of William's own world is kept; the answer
+-- is re-read at most 4 times a second.
 -- ---------------------------------------------------------------------------
 
-local combatState = { checkedAt = -1, inCombat = false }
+local combatState = { checkedAt = -math.huge, inCombat = false }
+
+local function enemyInfoOfThisWorld()
+    local world = Game.World()
+    local worldAddress = world and Unreal.AddressOf(world)
+    return Unreal.FindCached("enemyInfo", "EnemyInfoSubsystem", 5, function(subsystem)
+        local outer = try(function() return subsystem:GetOuter() end)
+        return worldAddress ~= nil and Unreal.AddressOf(outer) == worldAddress
+    end)
+end
 
 function Combat.IsInCombat()
-    if clock() - combatState.checkedAt < 0.25 then return combatState.inCombat end
-    combatState.checkedAt = clock()
-    local inCombat = nil
-    local combatSubsystem = Game.Subsystem("CombatSubsystem")
-    if combatSubsystem then inCombat = try(function() return combatSubsystem:IsInCombat() end) end
-    if inCombat == nil then
-        local enemyInfo = Game.Subsystem("EnemyInfoSubsystem")
-        local enemiesInCombat = enemyInfo and try(function() return enemyInfo.EnemiesInCombatState:GetArrayNum() end)
-        if type(enemiesInCombat) == "number" then inCombat = enemiesInCombat > 0 end
+    if os.clock() - combatState.checkedAt < 0.25 then return combatState.inCombat end
+    combatState.checkedAt = os.clock()
+    local enemyInfo = enemyInfoOfThisWorld()
+    local inCombat = false
+    if enemyInfo then
+        try(function()
+            enemyInfo.EnemiesInCombatState:ForEach(function(_, element)
+                if not inCombat and isValid(element:get()) then inCombat = true end
+            end)
+        end)
     end
-    inCombat = inCombat == true
     if inCombat ~= combatState.inCombat then Log.Debug("combat: " .. (inCombat and "started" or "ended")) end
     combatState.inCombat = inCombat
     return inCombat
@@ -44,8 +53,8 @@ end
 local perfectParryOverride = Override.new()
 local EXTRA_PARRY_WINDOW = 5.0
 
-local function applyPerfectParry(enabled)
-    if not enabled then
+local function applyPerfectParry()
+    if not State.settings.perfectParry then
         if perfectParryOverride:isActive() then perfectParryOverride:restore() end
         return
     end
@@ -67,41 +76,30 @@ end
 -- We scale that value for this one check (the attack data is a copy, nothing is saved).
 -- ---------------------------------------------------------------------------
 
-local parryHooks = { registered = false, scaledChecks = 0 }
-local BLOCK_CHECK_FUNCTIONS = { "CheckBlockMelee", "CheckBlockMeleeForProperties", "CheckBlockProjectile" }
+local parryHooksRegistered = false
 
 local function onBlockCheck(functionName, attackDataParam, blockerParam)
     local factor = State.settings.parryWindow or 1
     if factor == 1 then return end
-    local player = Game.Player()
-    local blocker = blockerParam and try(function() return blockerParam:get() end)
-    if not player or not isValid(blocker) or addressOf(blocker) ~= addressOf(player) then return end
+    if not Game.IsPlayer(blockerParam and try(function() return blockerParam:get() end)) then return end
     local attackData = try(function() return attackDataParam:get() end)
-    local openingTime = attackData and try(function() return attackData.PerfectParryOpeningTime end)
-    if type(openingTime) ~= "number" then return end
+    local openingTime = attackData and Unreal.TryNumber(function() return attackData.PerfectParryOpeningTime end)
+    if not openingTime then return end
     try(function() attackData.PerfectParryOpeningTime = openingTime * factor end)
-    local after = try(function() return attackDataParam:get().PerfectParryOpeningTime end)
-    if type(after) == "number" and math.abs(after - openingTime * factor) > 0.0001 then
+    local after = Unreal.TryNumber(function() return attackDataParam:get().PerfectParryOpeningTime end)
+    if after and math.abs(after - openingTime * factor) > 0.0001 then
         -- the struct came back as a copy: write it back as a whole
         try(function() attackDataParam:set(attackData) end)
-        after = try(function() return attackDataParam:get().PerfectParryOpeningTime end)
+        after = Unreal.TryNumber(function() return attackDataParam:get().PerfectParryOpeningTime end)
     end
-    parryHooks.scaledChecks = parryHooks.scaledChecks + 1
-    if parryHooks.scaledChecks <= 3 or Log.debugEnabled then
-        Log.Info(string.format("parry window x%s (%s): %.3f -> %s", tostring(factor), functionName, openingTime, tostring(after)))
-    end
+    Log.Limited("parry window", 3, string.format("parry window x%s (%s): %.3f -> %s", tostring(factor), functionName, openingTime, tostring(after)))
 end
 
 local function registerParryHooks()
-    if parryHooks.registered then return end
-    parryHooks.registered = true
-    local hooked = 0
-    for _, functionName in ipairs(BLOCK_CHECK_FUNCTIONS) do
-        local ok = pcall(RegisterHook, "/Script/MinotaurCore.MTCombatUtils:" .. functionName, function(_, attackData, blocker)
-            pcall(onBlockCheck, functionName, attackData, blocker)
-        end)
-        if ok then hooked = hooked + 1 end
-    end
+    if parryHooksRegistered then return end
+    parryHooksRegistered = true
+    local hooked = Game.HookCombatUtils({ "CheckBlockMelee", "CheckBlockMeleeForProperties", "CheckBlockProjectile" },
+        function(functionName, attackData, blocker) pcall(onBlockCheck, functionName, attackData, blocker) end)
     Log.Info("parry window: hooked " .. hooked .. " block checks")
 end
 
@@ -109,37 +107,37 @@ end
 -- Dodge Window: every dodge gives William GE_Invincibility for a short time (0.25 s in 1.0); hits in
 -- that time are dodged perfectly. We make that effect last longer (the game checks the duration again
 -- when it runs out) or remove it earlier for the harder settings.
+-- The effect list is only read when its length changes (a dodge adds effects) or while an early
+-- removal is pending.
 -- ---------------------------------------------------------------------------
 
 local DODGE_EFFECTS = { GE_DodgeAttackEnabled_C = true, GE_Dodge_WaitingForInput_C = true, GE_DodgeCooldown_C = true }
-local dodges = { handled = {}, logs = 0 }   -- handled: invincibility start time -> { wantedDuration, removed }
+local dodges = { handled = {}, lastEffectCount = -1, removalPending = false }
 
 local function applyDodgeWindow()
     local factor = State.settings.dodgeWindow or 1
     if factor == 1 then
-        if next(dodges.handled) then dodges.handled = {} end
+        dodges.handled, dodges.lastEffectCount, dodges.removalPending = {}, -1, false
         return
     end
+    local effectCount = Game.ActiveEffectCount()
+    if effectCount == dodges.lastEffectCount and not dodges.removalPending then return end
+    dodges.lastEffectCount = effectCount
     local worldTime = Game.WorldTime()
-    if type(worldTime) ~= "number" then return end
+    if not worldTime then return end
 
     local invincibilities, dodgeStartTimes = {}, {}
-    Game.ForEachActiveEffect(function(activeEffect, className, definition)
-        local startTime = try(function() return activeEffect.StartWorldTime end)
-        if not className or type(startTime) ~= "number" then return end
-        if className == "GE_Invincibility_C" then
-            invincibilities[#invincibilities + 1] = {
-                effect = activeEffect,
-                startTime = startTime,
-                effectClass = try(function() return definition:GetClass() end),
-            }
-        elseif DODGE_EFFECTS[className] then
-            dodgeStartTimes[#dodgeStartTimes + 1] = startTime
+    for _, entry in ipairs(Game.ActiveEffects()) do
+        if entry.startTime and entry.className == "GE_Invincibility_C" then
+            invincibilities[#invincibilities + 1] = entry
+        elseif entry.startTime and DODGE_EFFECTS[entry.className] then
+            dodgeStartTimes[#dodgeStartTimes + 1] = entry.startTime
         end
-    end)
+    end
 
     local abilitySystem = Game.AbilitySystem()
     local stillActive = {}
+    dodges.removalPending = false
     for _, invincibility in ipairs(invincibilities) do
         local key = string.format("%.3f", invincibility.startTime)
         stillActive[key] = true
@@ -152,22 +150,23 @@ local function applyDodgeWindow()
         end
         local handled = dodges.handled[key]
         if fromDodge and not handled then
-            local duration = try(function() return invincibility.effect.Spec.Duration end)
-            if type(duration) == "number" and duration > 0 and duration < 5 then
+            local duration = Unreal.TryNumber(function() return invincibility.effect.Spec.Duration end)
+            if duration and duration > 0 and duration < 5 then
                 handled = { wantedDuration = duration * factor }
                 dodges.handled[key] = handled
                 if factor > 1 then try(function() invincibility.effect.Spec.Duration = handled.wantedDuration end) end
-                dodges.logs = dodges.logs + 1
-                if dodges.logs <= 3 or Log.debugEnabled then
-                    Log.Info(string.format("dodge window x%s: %.2f s -> %.2f s", tostring(factor), duration, handled.wantedDuration))
-                end
+                Log.Limited("dodge window", 3, string.format("dodge window x%s: %.2f s -> %.2f s", tostring(factor), duration, handled.wantedDuration))
             end
         end
         -- harder settings: end the invincibility early
-        local expired = handled and worldTime - invincibility.startTime >= handled.wantedDuration
-        if expired and factor < 1 and not handled.removed and abilitySystem then
-            handled.removed = true
-            try(function() abilitySystem:RemoveActiveGameplayEffectBySourceEffect(invincibility.effectClass, nil, -1) end)
+        if handled and factor < 1 and not handled.removed then
+            if worldTime - invincibility.startTime >= handled.wantedDuration and abilitySystem then
+                handled.removed = true
+                local effectClass = try(function() return invincibility.definition:GetClass() end)
+                try(function() abilitySystem:RemoveActiveGameplayEffectBySourceEffect(effectClass, nil, -1) end)
+            else
+                dodges.removalPending = true
+            end
         end
     end
     for key in pairs(dodges.handled) do
@@ -183,22 +182,20 @@ local KILL_RADIUS = 6000   -- Unreal units (cm)
 
 function Combat.KillEnemiesNearby()
     local player = Game.Player()
-    local playerLocation = player and try(function() return player:K2_GetActorLocation() end)
+    local playerLocation = try(function() return player:K2_GetActorLocation() end)
     if not playerLocation then return end
     local killed = 0
-    for _, enemy in ipairs(FindAllOf("EnemyCharacter") or {}) do
-        if isValid(enemy) then
-            local location = try(function() return enemy:K2_GetActorLocation() end)
-            local health = try(function() return enemy.HealthAttributes.Health.CurrentValue end)
-            if location and type(health) == "number" and health > 0 then
-                local dx, dy, dz = location.X - playerLocation.X, location.Y - playerLocation.Y, location.Z - playerLocation.Z
-                local inRange = dx * dx + dy * dy + dz * dz < KILL_RADIUS * KILL_RADIUS
-                if inRange and try(function()
-                    enemy:KillCharacter(player, { GameplayTags = {}, ParentTags = {} })
-                    return true
-                end) then
-                    killed = killed + 1
-                end
+    for _, enemy in ipairs(Unreal.FindAllLive("EnemyCharacter")) do
+        local location = try(function() return enemy:K2_GetActorLocation() end)
+        local health = Unreal.TryNumber(function() return enemy.HealthAttributes.Health.CurrentValue end)
+        if location and health and health > 0 then
+            local dx, dy, dz = location.X - playerLocation.X, location.Y - playerLocation.Y, location.Z - playerLocation.Z
+            local inRange = dx * dx + dy * dy + dz * dz < KILL_RADIUS * KILL_RADIUS
+            if inRange and try(function()
+                enemy:KillCharacter(player, { GameplayTags = {}, ParentTags = {} })
+                return true
+            end) then
+                killed = killed + 1
             end
         end
     end
@@ -210,13 +207,14 @@ end
 
 function Combat.Tick()
     if (State.settings.parryWindow or 1) ~= 1 then registerParryHooks() end
-    applyPerfectParry(State.settings.perfectParry == true)
+    applyPerfectParry()
     Log.Guarded("dodge window", applyDodgeWindow)
 end
 
-function Combat.Reset()
+Unreal.OnWorldReset(function()
     perfectParryOverride:forget()
-    dodges.handled = {}
-end
+    dodges.handled, dodges.lastEffectCount, dodges.removalPending = {}, -1, false
+    combatState.checkedAt = -math.huge
+end)
 
 return Combat

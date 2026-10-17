@@ -1,9 +1,8 @@
 -- ValorianSheet / ui/sheet.lua
 -- What the menu shows: six tabs, each row bound to a setting or an action of a feature module.
+-- Actions need a loaded save unless marked { anytime = true }.
 
-local Log = require("lib.log")
 local Game = require("game")
-local State = require("state")
 local Cheats = require("cheats")
 local Menu = require("ui.menu")
 local Combat = require("features.combat")
@@ -13,8 +12,6 @@ local Teleport = require("features.teleport")
 local BugReport = require("features.bug_report")
 
 local Sheet = {}
-
-local requiresSave = Cheats.RequiresSave
 
 -- { 1, 1.5, 2 } -> "1x (vanilla)", "1.5x", "2x"
 local function factorOptions(values, vanillaLabel)
@@ -40,9 +37,10 @@ local function percentOptions(values, lastLabel)
     return options
 end
 
-local function labeled(pairsList)
+-- { { "label", value }, ... } -> options
+local function labeled(entries)
     local options = {}
-    for _, entry in ipairs(pairsList) do options[#options + 1] = { label = entry[1], value = entry[2] } end
+    for _, entry in ipairs(entries) do options[#options + 1] = { label = entry[1], value = entry[2] } end
     return options
 end
 
@@ -58,21 +56,26 @@ local function survivalTab()
         Menu.Choice("Damage Taken", percentOptions({ 1, 0.75, 0.5, 0.25, 0.1 }), "damageTaken"),
         Menu.Choice("Max Health", factorOptions({ 1, 1.5, 2, 3, 5 }), "maxHealthFactor"),
         Menu.Section("Health Regeneration"),
-        Menu.Choice("Regeneration", labeled({ { "Off (vanilla)", 0 }, { "1% / s", 0.01 }, { "2% / s", 0.02 },
-            { "5% / s", 0.05 }, { "10% / s", 0.1 } }), "regenRate"),
+        Menu.Choice("Regeneration", labeled({ { "Off (vanilla)", 0 }, { "1 HP / s", 1 }, { "2 HP / s", 2 },
+            { "5 HP / s", 5 }, { "10 HP / s", 10 }, { "20 HP / s", 20 }, { "50 HP / s", 50 } }), "regenPerSecond"),
         Menu.Choice("Starts after a hit", labeled({ { "right away", 0 }, { "2 s", 2 }, { "5 s", 5 }, { "10 s", 10 } }), "regenDelay"),
+        Menu.Choice("Heals up to", labeled({ { "25%", 25 }, { "50%", 50 }, { "75%", 75 }, { "100%", 100 } }), "regenMaxPercent"),
         Menu.Toggle("Only out of combat", "regenOnlyOutOfCombat"),
     }
 end
 
-local selectedSlot = 1
-
 local function movementTab()
-    local slotAccessor = { get = function() return selectedSlot end, set = function(slot) selectedSlot = slot end }
+    local slot = Menu.Value(1)
+    local slotCache = { map = nil, options = nil }
     local function slotOptions()
-        local options = {}
-        for slot = 1, Teleport.SLOT_COUNT do options[slot] = { label = slot .. ": " .. Teleport.Describe(slot), value = slot } end
-        return options
+        local map = Game.MapName()
+        if slotCache.map ~= map or not slotCache.options then
+            slotCache.map, slotCache.options = map, {}
+            for index = 1, Teleport.SLOT_COUNT do
+                slotCache.options[index] = { label = index .. ": " .. Teleport.Describe(index, map), value = index }
+            end
+        end
+        return slotCache.options
     end
     return {
         Menu.Toggle("NoClip (Space up, Ctrl down)", "noClip"),
@@ -82,9 +85,12 @@ local function movementTab()
         Menu.Toggle("Toggle Sprint (keyboard)", "toggleSprint"),
         Menu.Toggle("Instant Sprint", "instantSprint"),
         Menu.Section("Teleport (kept per area)"),
-        Menu.Choice("Slot", slotOptions, slotAccessor),
-        Menu.Action("Save position here", requiresSave(function() Teleport.SaveHere(selectedSlot) end)),
-        Menu.Action("Teleport to slot", requiresSave(function() Teleport.GoTo(selectedSlot) end)),
+        Menu.Choice("Slot", slotOptions, slot),
+        Menu.Action("Save position here", function()
+            Teleport.SaveHere(slot.get())
+            slotCache.options = nil -- the slot's description changed
+        end),
+        Menu.Action("Teleport to slot", function() Teleport.GoTo(slot.get()) end),
     }
 end
 
@@ -96,7 +102,7 @@ local function combatTab()
         Menu.Choice("Parry Window", factorOptions({ 0.5, 0.75, 1, 1.5, 2, 4, 6 }), "parryWindow"),
         Menu.Choice("Dodge Window", factorOptions({ 0.5, 0.75, 1, 1.5, 2, 3, 4 }), "dodgeWindow"),
         Menu.Section("Actions"),
-        Menu.Action("Kill all enemies nearby", requiresSave(Combat.KillEnemiesNearby), "Kills every enemy within 60 m."),
+        Menu.Action("Kill all enemies nearby", Combat.KillEnemiesNearby, { confirm = "Kills every enemy within 60 m." }),
     }
 end
 
@@ -110,80 +116,73 @@ local function itemsTab()
         Menu.Toggle("Keep Catalysts On Death", "keepCatalysts"),
         Menu.Toggle("No Ability Costs", "noAbilityCosts"),
         Menu.Section("Actions"),
-        Menu.Action("Refill everything", requiresSave(Resources.RefillEverything)),
+        Menu.Action("Refill everything", Resources.RefillEverything),
     }
 end
 
-local giveCategory = Give.CATEGORIES[1].label
-local giveEntry = nil
-local giveAmount = 5
+local NO_ITEMS = { { label = "(load a save first)", value = nil } }
 
 local function giveTab()
+    local entry = Menu.Value(nil)
+    local amount = Menu.Value(5)
     local categoryOptions = {}
     for _, category in ipairs(Give.CATEGORIES) do categoryOptions[#categoryOptions + 1] = { label = category.label, value = category.label } end
+    local category = Menu.Value(categoryOptions[1].value)
+    local selectCategory = {
+        get = category.get,
+        set = function(label)
+            category.set(label)
+            entry.set(nil)
+        end,
+    }
+
+    -- Rebuilt only when the category or the catalog changes.
+    local itemCache = { category = nil, entries = nil, options = nil }
     local function itemOptions()
         local catalog = Game.Player() and Give.Catalog()
-        local entries = catalog and catalog[giveCategory]
-        if not entries or #entries == 0 then return { { label = "(load a save first)", value = nil } } end
-        local options = {}
-        for index, entry in ipairs(entries) do options[index] = { label = entry.label, value = entry } end
-        if not giveEntry then giveEntry = entries[1] end
-        return options
+        local entries = catalog and catalog[category.get()]
+        if not entries or #entries == 0 then return NO_ITEMS end
+        if itemCache.entries ~= entries then
+            itemCache.entries, itemCache.options = entries, {}
+            for index, itemEntry in ipairs(entries) do itemCache.options[index] = { label = itemEntry.label, value = itemEntry } end
+        end
+        if not entry.get() then entry.set(entries[1]) end
+        return itemCache.options
     end
+
     return {
-        Menu.Action("+1,000 Catalysts", requiresSave(function() Give.Catalysts(1000) end)),
-        Menu.Action("+10,000 Catalysts", requiresSave(function() Give.Catalysts(10000) end)),
-        Menu.Action("+99 of every upgrade material", requiresSave(function() Give.UpgradeMaterials(99) end)),
-        Menu.Action("+5 of every consumable", requiresSave(function() Give.EveryConsumable(5) end)),
-        Menu.Action("Unlock all weapons", requiresSave(Give.AllWeapons), "Adds every weapon to this save. This can not be undone."),
-        Menu.Action("Unlock all abilities", requiresSave(Give.AllAbilities), "Unlocks every ability on this save. This can not be undone."),
-        Menu.Action("Unlock all gems", requiresSave(Give.AllGems), "Adds every gem to this save. This can not be undone."),
+        Menu.Action("+1,000 Catalysts", function() Give.Catalysts(1000) end),
+        Menu.Action("+10,000 Catalysts", function() Give.Catalysts(10000) end),
+        Menu.Action("+99 of every upgrade material", function() Give.UpgradeMaterials(99) end),
+        Menu.Action("+5 of every consumable", function() Give.EveryConsumable(5) end),
+        Menu.Action("Unlock all weapons", Give.AllWeapons, { confirm = "Adds every weapon to this save. This can not be undone." }),
+        Menu.Action("Unlock all abilities", Give.AllAbilities, { confirm = "Unlocks every ability on this save. This can not be undone." }),
+        Menu.Action("Unlock all gems", Give.AllGems, { confirm = "Adds every gem to this save. This can not be undone." }),
         Menu.Section("Give Item"),
-        Menu.Choice("Category", categoryOptions, {
-            get = function() return giveCategory end,
-            set = function(label) giveCategory, giveEntry = label, nil end,
-        }),
-        Menu.Choice("Item", itemOptions, {
-            get = function() return giveEntry end,
-            set = function(entry) giveEntry = entry end,
-        }, { slider = true }),
+        Menu.Choice("Category", categoryOptions, selectCategory),
+        Menu.Choice("Item", itemOptions, entry, { slider = true }),
         Menu.Choice("Amount", labeled({ { "1", 1 }, { "5", 5 }, { "10", 10 }, { "25", 25 }, { "50", 50 },
-            { "99", 99 }, { "250", 250 }, { "999", 999 } }), {
-            get = function() return giveAmount end,
-            set = function(amount) giveAmount = amount end,
-        }, { wrap = false }),
-        Menu.Action("Give", requiresSave(function() Give.Item(giveEntry, giveAmount) end)),
+            { "99", 99 }, { "250", 250 }, { "999", 999 } }), amount, { wrap = false }),
+        Menu.Action("Give", function() Give.Item(entry.get(), amount.get()) end),
     }
 end
 
-local function miscTab(saveSettings)
+local function miscTab()
     return {
-        Menu.Action("Turn everything off", function()
-            Cheats.TurnEverythingOff()
-            saveSettings()
-            State.status = "Everything is back to vanilla"
-        end, "Sets every cheat back to vanilla."),
-        Menu.Toggle("Debug logging", {
-            get = function() return Log.debugEnabled end,
-            set = function(enabled)
-                Log.debugEnabled = enabled
-                Log.Info("debug logging " .. (enabled and "ON" or "OFF"))
-                saveSettings()
-            end,
-        }),
-        Menu.Action("Write bug report", BugReport.Write),
+        Menu.Action("Turn everything off", Cheats.TurnEverythingOff, { confirm = "Sets every cheat back to vanilla.", anytime = true }),
+        Menu.Toggle("Debug logging", "debugLogging"),
+        Menu.Action("Write bug report", BugReport.Write, { anytime = true }),
         Menu.Info(function() return Game.NAME .. " v" .. Game.VERSION end),
     }
 end
 
--- saveSettings: persists State.settings (called after changes that are not a settings key).
-function Sheet.Build(saveSettings)
+function Sheet.Build()
     Menu.AddTab("Survival", survivalTab())
     Menu.AddTab("Movement", movementTab())
     Menu.AddTab("Combat", combatTab())
     Menu.AddTab("Items", itemsTab())
     Menu.AddTab("Give", giveTab())
-    Menu.AddTab("Misc", miscTab(saveSettings))
+    Menu.AddTab("Misc", miscTab())
 end
 
 return Sheet

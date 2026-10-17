@@ -8,8 +8,8 @@ local Widgets = {}
 local try = Unreal.Try
 
 -- ESlateVisibility
-Widgets.SHOWN = 4        -- SelfHitTestInvisible: drawn, children (sliders) still take the mouse
-Widgets.COLLAPSED = 1
+local SHOWN = 4        -- SelfHitTestInvisible: drawn, children (sliders) still take the mouse
+local COLLAPSED = 1
 
 Widgets.COLORS = {
     frame = { R = 0.42, G = 0.40, B = 0.37, A = 0.95 },
@@ -28,12 +28,11 @@ Widgets.COLORS = {
 -- Widget names must be unique per outer; every build gets its own prefix.
 local buildNumber = 0
 function Widgets.StartBuild() buildNumber = buildNumber + 1 end
-local function uniqueName(name) return "ValorianSheet" .. buildNumber .. "_" .. name end
 
 function Widgets.Construct(classPath, outer, name)
-    local widgetClass = StaticFindObject(classPath)
+    local widgetClass = Unreal.Static(classPath)
     if not Unreal.IsValid(widgetClass) then error("missing class " .. classPath) end
-    local widget = StaticConstructObject(widgetClass, outer, FName(uniqueName(name)))
+    local widget = StaticConstructObject(widgetClass, outer, FName("ValorianSheet" .. buildNumber .. "_" .. name))
     if not Unreal.IsValid(widget) then error("could not construct " .. classPath) end
     return widget
 end
@@ -81,12 +80,12 @@ function Widgets.Pad(target, left, top, right, bottom)
     try(function() target:SetPadding({ Left = left, Top = top, Right = right, Bottom = bottom }) end)
 end
 
-function Widgets.Slider(tree, name, minimum, maximum, step, value, width)
+function Widgets.Slider(tree, name, minimum, maximum, value, width)
     local box = Widgets.SizeBox(tree, name .. "Box", width, 18.0)
     local slider = Widgets.Construct("/Script/UMG.Slider", tree, name)
     try(function() slider:SetMinValue(minimum) end)
     try(function() slider:SetMaxValue(maximum) end)
-    try(function() slider:SetStepSize(step) end)
+    try(function() slider:SetStepSize(1) end)
     try(function() slider.MouseUsesStep = true end)
     try(function() slider.IsFocusable = false end)
     try(function() slider:SetSliderBarColor(Widgets.COLORS.sliderTrack) end)
@@ -97,15 +96,12 @@ function Widgets.Slider(tree, name, minimum, maximum, step, value, width)
 end
 
 function Widgets.SliderValue(slider)
-    local value = try(function() return slider.Value end)
-    if type(value) == "number" then return value end
-    value = try(function() return slider:GetValue() end)
-    if type(value) == "number" then return value end
-    return nil
+    return Unreal.TryNumber(function() return slider.Value end)
+        or Unreal.TryNumber(function() return slider:GetValue() end)
 end
 
 function Widgets.SetVisible(widget, visible)
-    try(function() widget:SetVisibility(visible and Widgets.SHOWN or Widgets.COLLAPSED) end)
+    try(function() widget:SetVisibility(visible and SHOWN or COLLAPSED) end)
 end
 
 return Widgets

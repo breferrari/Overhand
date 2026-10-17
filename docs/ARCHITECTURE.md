@@ -12,7 +12,7 @@ main.lua ──► settings.lua ─────────────┐
    │                        ├─► ui/input.lua               ├─► game.lua ──► lib/unreal.lua
    │                        ├─► ui/game_menus.lua          └─► lib/override.lua
    │                        └─► ui/widgets.lua
-   └──► one game-thread loop: Menu.Tick, then Cheats.Tick (every 33 ms)
+   └──► one game-thread loop (every 33 ms): Menu.Tick, Cheats.Tick, Settings.SaveIfDirty
 ```
 
 | Module | Responsibility |
@@ -23,9 +23,9 @@ main.lua ──► settings.lua ─────────────┐
 | `lib/override.lua` | Change a game value and put the vanilla value back later, even when the game changes it in between; keeps the **attribute ledger** for values that end up in the save file. |
 | `game.lua` | Access to Valor Mortis: controller, player, components, attribute sets, subsystems, items, effects, the developers' cheat manager. |
 | `state.lua` | `State.settings` (what the player chose), status line, teleports, ledger, and the few runtime flags that more than one feature reads. |
-| `features/*.lua` | One module per feature group. Each exposes `Tick()` and `Reset()` plus the actions the menu calls. |
-| `cheats.lua` | Calls every feature's `Tick` in order, detects a new player / world and calls every `Reset`, runs the once-per-load checks. |
-| `settings.lua` | `settings.cfg` and `teleports.txt`; one-time import from the Valor Mortis Cheat Menu. |
+| `features/*.lua` | One module per feature group. Each exposes `Tick()` plus the actions the menu calls, and registers its per-world state with `Unreal.OnWorldReset`. |
+| `cheats.lua` | Calls every feature's `Tick` in order, detects a new William (new save, map, respawn) and runs `Unreal.ResetWorld()`, runs the once-per-load checks. |
+| `settings.lua` | `settings.cfg` and `teleports.txt`, saved through `Settings.MarkDirty()` (at most once a second); one-time import from the Valor Mortis Cheat Menu and Passive Health Regen. |
 | `ui/menu.lua` | The menu framework: item kinds (toggle, choice, action, section, info), navigation, drawing, open/close. |
 | `ui/sheet.lua` | The menu's content: which rows each tab has and what they are bound to. |
 | `ui/widgets.lua` | Building UMG widgets from Lua; colours. |
@@ -52,15 +52,17 @@ main.lua ──► settings.lua ─────────────┐
 ## Rules
 
 1. **Game thread only.** One loop (`LoopInGameThreadWithDelay`) runs the menu and the cheats. Key callbacks only queue a command; hooks only touch their parameters. No `LoopAsync`.
-2. **No per-tick searches.** `FindAllOf` walks every object in the game. Look objects up through `Unreal.FindCached` / `Game.*`, which keep what they found and wait before searching again after a miss. Searching on a button press is fine. See [PERFORMANCE.md](PERFORMANCE.md).
+2. **No per-tick searches.** `FindAllOf` walks every object in the game. Look objects up through `Unreal.FindCached` / `Unreal.FindAllCached` / `Game.*`, which keep what they found and wait before searching again after a miss. Searching on a button press is fine. See [PERFORMANCE.md](PERFORMANCE.md).
 3. **Off means vanilla.** A cheat that is switched off must leave the game as it found it. Use `Override` for any value the game also writes; record attributes that are saved in the ledger.
 4. **Everything is guarded.** Unreal calls go through `Unreal.Try`; feature work that can fail runs under `Log.Guarded`, so one broken cheat never stops the loop.
-5. **The menu only writes settings.** Features read `State.settings` and apply it in their `Tick`. Actions (buttons) are plain functions on the feature modules.
-6. **Names say what things are.** Full names for modules (`Game`, `State`, `Health`) and locals (`player`, `healthSet`, `factor`).
+5. **The menu only writes settings.** Features read `State.settings` and apply it in their `Tick`. Actions (buttons) are plain functions on the feature modules; the menu checks that a save is loaded before running one (unless it is marked `anytime`) and asks twice when it has a `confirm` prompt.
+6. **One world reset.** Objects found through `lib/unreal.lua` are per world and dropped automatically; other per-world state is dropped in a callback registered with `Unreal.OnWorldReset`. Nothing else resets by hand.
+7. **One way to save.** Whatever changes persisted state calls `Settings.MarkDirty()`; the main loop writes the files.
+8. **Names say what things are.** Full names for modules (`Game`, `State`, `Health`) and locals (`player`, `healthSet`, `factor`).
 
 ## Adding a cheat
 
 1. Add the setting with its vanilla value to `State.settings` in `state.lua`.
-2. Implement it in the matching `features/` module: apply it in `Tick`, forget world objects in `Reset`.
+2. Implement it in the matching `features/` module: apply it in `Tick`; register anything per-world that is not a cached lookup with `Unreal.OnWorldReset`.
 3. Add a row in `ui/sheet.lua` (`Menu.Toggle`, `Menu.Choice` or `Menu.Action`).
 4. Run `python -I tools/smoke_test.py`, then try it in the game.

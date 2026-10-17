@@ -13,17 +13,13 @@ local State = require("state")
 
 local Damage = {}
 
-local try, isValid, addressOf = Unreal.Try, Unreal.IsValid, Unreal.AddressOf
+local try, isValid = Unreal.Try, Unreal.IsValid
 
 local ONE_HIT_FACTOR = 100000
 
-local hooks = {
-    registered = false,
-    lastIncomingAt = -99,
-    incomingLogs = 0,
-    outgoingLogs = 0,
-    callDepth = 0,
-}
+local hooksRegistered = false
+local lastIncomingAt = -math.huge
+local callDepth = 0
 
 -- Hooked function -> parameter positions (1-based, after the context object) of the damage values,
 -- the target and the attacker.
@@ -41,77 +37,62 @@ local DAMAGE_FUNCTIONS = {
     DealCombinedDamage = { damage = { 2, 3, 4, 5, 7, 8, 10 }, target = 12, attacker = 13 },
 }
 
--- Is this actor William, or something he fired (a projectile or grenade: its Instigator is William)?
-local function isFromPlayer(actor, playerAddress)
-    if not isValid(actor) then return false end
-    if addressOf(actor) == playerAddress then return true end
-    local instigator = try(function() return actor.Instigator end)
-    return isValid(instigator) and addressOf(instigator) == playerAddress
+-- William, or something he fired (a projectile or grenade: its Instigator is William).
+local function isFromPlayer(actor)
+    if Game.IsPlayer(actor) then return true end
+    return isValid(actor) and Game.IsPlayer(try(function() return actor.Instigator end))
 end
 
 local function scaleDamage(layout, params, factor)
     for _, position in ipairs(layout.damage) do
         local param = params[position]
-        local value = param and try(function() return param:get() end)
-        if type(value) == "number" and value > 0 then
-            try(function() param:set(value * factor) end)
-        end
+        local value = param and Unreal.TryNumber(function() return param:get() end)
+        if value and value > 0 then try(function() param:set(value * factor) end) end
     end
 end
 
-local function onDamage(functionName, layout, params)
-    local player = Game.Player()
-    if not player then return end
-    local playerAddress = addressOf(player)
+local function onDamage(functionName, ...)
+    local layout, params = DAMAGE_FUNCTIONS[functionName], { ... }
     local targetParam, attackerParam = params[layout.target], params[layout.attacker]
-    local target = targetParam and try(function() return targetParam:get() end)
-    local attacker = attackerParam and try(function() return attackerParam:get() end)
     local settings = State.settings
 
-    if isValid(target) and addressOf(target) == playerAddress then
+    if Game.IsPlayer(targetParam and try(function() return targetParam:get() end)) then
         local factor = settings.godMode and 0 or (settings.damageTaken or 1)
         if factor >= 1 then return end
         scaleDamage(layout, params, factor)
-        hooks.lastIncomingAt = State.clock()
-        hooks.incomingLogs = hooks.incomingLogs + 1
-        if hooks.incomingLogs <= 3 or Log.debugEnabled then
-            Log.Info("damage reduced before the hit (" .. functionName .. ")")
-        end
+        lastIncomingAt = os.clock()
+        Log.Limited("incoming damage", 3, "damage reduced before the hit (" .. functionName .. ")")
         return
     end
 
-    if isFromPlayer(attacker, playerAddress) then
+    if isFromPlayer(attackerParam and try(function() return attackerParam:get() end)) then
         local factor = settings.oneHitKills and ONE_HIT_FACTOR or (settings.damageMultiplier or 1)
         if factor == 1 then return end
         scaleDamage(layout, params, factor)
-        hooks.outgoingLogs = hooks.outgoingLogs + 1
-        if hooks.outgoingLogs <= 3 or Log.debugEnabled then
-            Log.Info("your damage x" .. factor .. " (" .. functionName .. ")")
-        end
+        Log.Limited("outgoing damage", 3, "your damage x" .. factor .. " (" .. functionName .. ")")
     end
 end
 
 local function registerHooks()
-    if hooks.registered then return end
-    hooks.registered = true
-    local hooked = 0
-    for functionName, layout in pairs(DAMAGE_FUNCTIONS) do
-        -- When one damage function calls another through script, only the outer one is scaled.
-        local ok = pcall(RegisterHook, "/Script/MinotaurCore.MTCombatUtils:" .. functionName, function(_, ...)
-            hooks.callDepth = hooks.callDepth + 1
-            if hooks.callDepth == 1 then pcall(onDamage, functionName, layout, { ... }) end
-        end, function()
-            hooks.callDepth = math.max(hooks.callDepth - 1, 0)
-        end)
-        if ok then hooked = hooked + 1 end
-    end
+    if hooksRegistered then return end
+    hooksRegistered = true
+    local functionNames = {}
+    for functionName in pairs(DAMAGE_FUNCTIONS) do functionNames[#functionNames + 1] = functionName end
+    -- When one damage function calls another through script, only the outer one is scaled.
+    local hooked = Game.HookCombatUtils(functionNames, function(functionName, ...)
+        callDepth = callDepth + 1
+        if callDepth == 1 then pcall(onDamage, functionName, ...) end
+    end, function()
+        callDepth = math.max(callDepth - 1, 0)
+    end)
     Log.Info("damage: hooked " .. hooked .. " damage functions")
 end
 
 -- Did a hook reduce incoming damage in the last half second? (then the fallback in health.lua waits)
-function Damage.ReducedRecently() return State.clock() - hooks.lastIncomingAt < 0.5 end
+function Damage.ReducedRecently() return os.clock() - lastIncomingAt < 0.5 end
 
 function Damage.Tick()
+    if hooksRegistered then return end
     local settings = State.settings
     if (settings.damageTaken or 1) < 1 or settings.godMode or settings.oneHitKills
         or (settings.damageMultiplier or 1) ~= 1 then

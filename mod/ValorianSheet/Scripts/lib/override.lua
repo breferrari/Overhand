@@ -15,6 +15,7 @@ local Unreal = require("lib.unreal")
 local Log = require("lib.log")
 local Game = require("game")
 local State = require("state")
+local Settings = require("settings")
 
 local Override = {}
 Override.__index = Override
@@ -23,44 +24,25 @@ local try = Unreal.Try
 
 function Override.new() return setmetatable({ entries = {} }, Override) end
 
--- ---------------------------------------------------------------------------
--- Ledger
--- ---------------------------------------------------------------------------
-
-local ledgerDirty = false
-local nextLedgerSaveAt = 0
-
 function Override.RecordInLedger(attributeName, entry)
     State.attributeLedger[attributeName] = entry
-    ledgerDirty = true
-end
-
--- Persists the ledger, at most once a second.
-function Override.FlushLedger()
-    if not ledgerDirty or State.clock() < nextLedgerSaveAt then return end
-    ledgerDirty = false
-    nextLedgerSaveAt = State.clock() + 1
-    if State.onLedgerChanged then pcall(State.onLedgerChanged, State.attributeLedger) end
+    Settings.MarkDirty()
 end
 
 function Override.NearlyEqual(a, b)
     return math.abs(a - b) <= math.max(0.0001, math.abs(b) * 0.0001)
 end
 
--- ---------------------------------------------------------------------------
--- Overrides
--- ---------------------------------------------------------------------------
-
 -- factorOrFunction: a number multiplies the base, a function computes the value from the base.
-local function asComputation(factorOrFunction)
-    if type(factorOrFunction) == "function" then return factorOrFunction end
-    return function(base) return base * factorOrFunction end
+local function compute(factorOrFunction, base)
+    if type(factorOrFunction) == "function" then return factorOrFunction(base) end
+    return base * factorOrFunction
 end
 
 -- A plain number property (CharacterMovement.MaxWalkSpeed, ...).
 function Override:property(object, propertyName, factorOrFunction)
-    local current = try(function() return object[propertyName] end)
-    if type(current) ~= "number" then return end
+    local current = Unreal.TryNumber(function() return object[propertyName] end)
+    if not current then return end
     local key = tostring(Unreal.AddressOf(object)) .. ":" .. propertyName
     local entry = self.entries[key]
     if not entry then
@@ -71,7 +53,7 @@ function Override:property(object, propertyName, factorOrFunction)
         Log.Debug(propertyName .. ": game set " .. tostring(current) .. ", new base")
         entry.base = current
     end
-    local wanted = asComputation(factorOrFunction)(entry.base)
+    local wanted = compute(factorOrFunction, entry.base)
     if math.abs(current - wanted) > 0.001 then
         try(function() object[propertyName] = wanted end)
     end
@@ -80,25 +62,26 @@ end
 
 -- A gameplay attribute (FGameplayAttributeData).
 function Override:attribute(set, attributeName, factorOrFunction)
-    local base = Game.GetBaseValue(set, attributeName)
-    if type(base) ~= "number" then return end
+    local currentBase = Game.GetBaseValue(set, attributeName)
+    if not currentBase then return end
     local key = tostring(Unreal.AddressOf(set)) .. ":" .. attributeName
     local entry = self.entries[key]
     if not entry then
+        local vanilla = currentBase
         local recorded = State.attributeLedger[attributeName]
-        if recorded and Override.NearlyEqual(base, recorded.written) then
-            Log.Info(attributeName .. ": " .. base .. " is our own value from last time, vanilla is " .. recorded.vanilla)
-            base = recorded.vanilla
+        if recorded and Override.NearlyEqual(currentBase, recorded.written) then
+            Log.Info(attributeName .. ": " .. currentBase .. " is our own value from last time, vanilla is " .. recorded.vanilla)
+            vanilla = recorded.vanilla
         end
-        entry = { set = set, attributeName = attributeName, base = base }
+        entry = { set = set, attributeName = attributeName, base = vanilla }
         self.entries[key] = entry
-        Log.Debug(attributeName .. ": vanilla " .. tostring(base))
-    elseif entry.written and not Override.NearlyEqual(base, entry.written) then
-        Log.Debug(attributeName .. ": game set base " .. tostring(base) .. ", new vanilla")
-        entry.base = base
+        Log.Debug(attributeName .. ": vanilla " .. tostring(vanilla))
+    elseif entry.written and not Override.NearlyEqual(currentBase, entry.written) then
+        Log.Debug(attributeName .. ": game set base " .. tostring(currentBase) .. ", new vanilla")
+        entry.base = currentBase
     end
-    local wanted = asComputation(factorOrFunction)(entry.base)
-    if not Override.NearlyEqual(Game.GetBaseValue(set, attributeName), wanted) then
+    local wanted = compute(factorOrFunction, entry.base)
+    if not Override.NearlyEqual(currentBase, wanted) then
         Game.SetBaseValueKeepModifiers(set, attributeName, wanted)
     end
     if entry.written ~= wanted or not State.attributeLedger[attributeName] then
@@ -110,8 +93,8 @@ end
 function Override:restore()
     for _, entry in pairs(self.entries) do
         if entry.object and Unreal.IsValid(entry.object) then
-            local current = try(function() return entry.object[entry.propertyName] end)
-            if type(current) == "number" and entry.written and math.abs(current - entry.written) < 0.001 then
+            local current = Unreal.TryNumber(function() return entry.object[entry.propertyName] end)
+            if current and entry.written and math.abs(current - entry.written) < 0.001 then
                 try(function() entry.object[entry.propertyName] = entry.base end)
             end
         elseif entry.set then
