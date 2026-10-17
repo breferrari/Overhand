@@ -19,7 +19,7 @@ HEALTH REGENERATION
   Regeneration                     Off (vanilla)
 
 Ready
-Arrows / D-pad select and change   Enter / A use   Q/E / LB RB tab   F5 / B close
+Arrows / D-pad select and change   Enter / A use   Q/E / LB/RB tab   F5 / B close
 ```
 
 ## What's in it

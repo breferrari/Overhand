@@ -26,7 +26,7 @@ local COLORS = Widgets.COLORS
 local try, isValid = Unreal.Try, Unreal.IsValid
 
 local TITLE = "VALORIAN SHEET"
-local HINT = "Arrows / D-pad select and change   Enter / A use   Q/E / LB RB tab   F5 / B close"
+local HINT = "Arrows / D-pad select and change   Enter / A use   Q/E / LB/RB tab   F5 / B close"
 local MIN_WIDTH = 460
 local SLIDER_WIDTH = 150
 local VALUE_WIDTH = 120
