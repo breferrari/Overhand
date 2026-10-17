@@ -58,7 +58,7 @@ Scripts\game\       games\<game>\      (only that game)
 assets\             assets\            (the menu's mark, arrows, button disc, fonts)
 ```
 
-A game update or a store's "repair" / "verify files" can remove UE4SS and the mod; install again afterwards. Your `settings.cfg` and teleports are kept across installs. The game's `manifest.json` lists other mods Overhand replaces (they are switched off, not deleted) and earlier folder names to take settings from.
+A game update or a store's "repair" / "verify files" can remove UE4SS and the mod; install again afterwards. Your `settings.cfg` and teleports are kept across installs.
 
 ## Files it writes
 
@@ -84,8 +84,6 @@ All inside `Mods\Overhand\`:
 | **Give** | +1,000 / +10,000 Catalysts · +99 of every upgrade material · +5 of every consumable · Unlock all weapons / abilities / gems · **Give Item**: any consumable, material, instant or quest item from a list, 1–999 at a time (the count is checked afterwards) |
 | **Quests** | Your active quests and what each one's current step asks for (read only) · Refresh the list · Write quest report |
 | **Misc** | Turn everything off · Debug logging · Write bug report · Find controller button icons |
-
-Overhand replaces the Valor Mortis Cheat Menu and AeonGreyh's Passive Health Regen; the install switches them off. Damage multipliers left in a save by Cheat Menu 1.1.0 and older are repaired automatically.
 
 ## Performance
 

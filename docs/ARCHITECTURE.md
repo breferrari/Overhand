@@ -26,7 +26,7 @@ UE4SS loads `Scripts/main.lua`; everything else is a module loaded with `require
 
 Each game also has a reference of its internals in `docs/games/<game>.md`.
 
-`manifest.json` holds what the installer and the smoke test need: the game's folder names (`installFolders`, as Steam, the Xbox app, Epic or GOG name its folder; the installer finds the install) and Unreal project folder (`projectFolder`, which holds `Binaries\Win64` or `WinGDK`), its process name, whether it uses GAS, mods Overhand replaces (switched off on install), earlier folder names of this mod (settings migrated, folder removed), and the smoke test's expectations.
+`manifest.json` holds what the installer and the smoke test need: the game's folder names (`installFolders`, as Steam, the Xbox app, Epic or GOG name its folder; the installer finds the install) and Unreal project folder (`projectFolder`, which holds `Binaries\Win64` or `WinGDK`), its process name, whether it uses GAS, and the smoke test's expectations.
 
 ## Layers
 
@@ -103,7 +103,7 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 | `features/progression.lua` | Free Respec (the lantern's respec costs) |
 | `features/quests.lua` | The Quests tab: active quests and what their current step asks for (read only); the quest report (`Overhand-Quests.txt`) |
 | `features/dev_actions.lua` | The developers' Blueprint cheat actions; No Ability Costs |
-| `features/saved_values.lua` | Once per world: repairs old cheat menu damage values, restores ledger values |
+| `features/saved_values.lua` | Once per world: puts back values the game saved while a cheat was on (from the ledger) |
 
 ## Rules
 

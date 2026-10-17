@@ -6,19 +6,6 @@ UE4SS's `FindAllOf(className)` walks the game's entire object array (hundreds of
 
 Everything else (reading and writing properties, calling functions on objects the mod already holds) crosses from Lua into C++ once per call. That is cheap, but not free at 30 ticks a second, so per-tick paths also avoid repeating calls they don't need.
 
-## What the Valor Mortis Cheat Menu 1.3.2 did
-
-Per-tick or timer paths in the original that ran full object searches, found by reading its code. The stutters from the first two were confirmed in play; the rest follow from the same pattern.
-
-| Where | When | Searches |
-|---|---|---|
-| Game-menu watch (`activeGameMenu`) | every 0.1 s **while its menu was open** | 13 classes → **~130 searches/s** |
-| Health bar update (`updateHealthBar`) | every 0.25 s **while Health Regeneration healed** (and on every direct heal) | 4/s |
-| Combat check (`inCombat`) | every 0.25 s when an "only out of combat" option was on | 4–8/s |
-| Toggle Sprint ability lookup | every 1 s **while Toggle Sprint was on** | 1/s |
-| Player controller lookup | **every tick (30/s)** whenever no player controller existed: main menu, loading screens | 30/s |
-| Attribute set / inventory / save subsystem lookups | every tick while not found yet | up to 30/s each |
-
 ## How Overhand finds objects
 
 All searches go through `core/unreal.lua`, the one place allowed to call `FindAllOf`:
@@ -29,13 +16,13 @@ All searches go through `core/unreal.lua`, the one place allowed to call `FindAl
 
 Everything kept is per world and dropped by the single world reset when a new William appears.
 
-| Path | Now |
+| Path | Cost |
 |---|---|
 | Game menus | Searched only when you press F5, at most once a minute per class that has no widget yet. While our menu is open only the kept widgets are checked, twice a second. The game gets no input while it's open, so its menus can't open by accident. |
 | Health bar | The HUD widget is a ranked cached lookup (`Unreal.FindRanked`: William's own HUD first, unknown owner as fallback); the bar is its child. **0 searches** once his HUD is found. |
 | Combat check | The enemy-info subsystem of William's world is kept. **0 searches** after the first. |
 | Toggle Sprint | `FindAllCached`, retry 5 s. |
-| Controller, components, attribute sets, inventory, save subsystem | `FindCached` / kept: 1–5 s between searches after a miss; in the main menu that's **1 search/s** instead of 30. |
+| Controller, components, attribute sets, inventory, save subsystem | `FindCached` / kept: 1–5 s between searches after a miss; in the main menu that's **1 search/s**. |
 | Kill All Enemies Nearby, Give, unlocks | One search on the button press. |
 
 ## Per-tick work

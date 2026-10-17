@@ -16,11 +16,9 @@
     GOG installs, by the folder names in the manifest (installFolders). Its UE4SS Mods folder is
     <projectFolder>\Binaries\Win64 or WinGDK, then ue4ss\Mods (UE4SS 3) or Mods (older UE4SS).
 
-    games\<game>\manifest.json names the game's folders, whether it uses GAS, which mods Overhand
-    replaces (switched off: enabled.txt renamed to enabled.txt.disabled) and which earlier folders of
-    this mod to migrate settings from (then removed).
+    games\<game>\manifest.json names the game's folders and whether it uses GAS.
 
-    -Uninstall removes the mod and switches the replaced mods back on.
+    -Uninstall removes the mod.
     -BuildOnly assembles build\<game>\ without installing.
 
 .EXAMPLE
@@ -177,27 +175,10 @@ $target = Join-Path $mods $manifest.modName
 
 if ($Uninstall) {
     if (Test-Path $target) { Remove-Item $target -Recurse -Force; "Removed $target" }
-    foreach ($name in $manifest.replacesMods) {
-        $disabled = Join-Path $mods "$name\enabled.txt.disabled"
-        if (Test-Path $disabled) { Rename-Item $disabled "enabled.txt"; "$name switched back on" }
-    }
     return
 }
 
 $keep = @("settings.cfg", "teleports.txt")
-
-# Settings from an earlier folder of this mod (an older name), then that folder goes.
-foreach ($previous in $manifest.previousModFolders) {
-    $previousFolder = Join-Path $mods $previous
-    if (-not (Test-Path $previousFolder)) { continue }
-    New-Item -ItemType Directory $target -Force | Out-Null
-    foreach ($file in $keep) {
-        $from = Join-Path $previousFolder $file
-        if ((Test-Path $from) -and -not (Test-Path (Join-Path $target $file))) { Copy-Item $from $target; "Kept $file from $previous" }
-    }
-    Remove-Item $previousFolder -Recurse -Force
-    "Removed the earlier folder $previous"
-}
 
 if (Test-Path $target) {
     # Replace the scripts, keep the player's files and logs.
@@ -207,11 +188,3 @@ if (Test-Path $target) {
 New-Item -ItemType Directory $target -Force | Out-Null
 Copy-Item (Join-Path $build "*") $target -Recurse -Force
 "Installed to $target"
-
-foreach ($name in $manifest.replacesMods) {
-    $enabled = Join-Path $mods "$name\enabled.txt"
-    if (Test-Path $enabled) {
-        Rename-Item $enabled "enabled.txt.disabled"
-        "$name switched off ($($manifest.modName) replaces it)"
-    }
-}

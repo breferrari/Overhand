@@ -85,7 +85,7 @@ end)
 
 - **Path format:** `/Script/<Module>.<Class>:<Function>` for C++ functions; Blueprint classes use their asset path. The module is the header file's name.
 - **Struct parameters may arrive as copies.** After changing a field, read it back; if it didn't change, write the whole struct back with `param:set(struct)` (the parry window code does both).
-- **Only hook loaded Blueprint functions.** Per the Cheat Menu's notes, hooking a Blueprint function whose class wasn't loaded yet failed and could leave the Lua state broken. Our hooks on C++ (`/Script/`) functions registered fine at any time.
+- **Only hook loaded Blueprint functions.** Hooking a Blueprint function whose class isn't loaded yet fails and can leave the Lua state broken. Our hooks on C++ (`/Script/`) functions registered fine at any time.
 - A hooked function that calls another hooked one runs both hooks; count the depth if only the outer call should act (`features/damage.lua`).
 
 **GAS attributes** (if the game uses GAS): `BaseValue` is saved in the save file, `CurrentValue` is base plus active modifiers and is rebuilt by the game. Change `CurrentValue` for live-only effects; change `BaseValue` only through `Gas.BASE_VALUE` so the ledger keeps the vanilla value.
@@ -101,10 +101,10 @@ end)
 
 | Pitfall | What happened | Do instead |
 |---|---|---|
-| `FindAllOf` on a timer | The Cheat Menu searched every object ~130 times a second while its menu was open: stutter. | Cached lookups; search on button presses only. |
+| `FindAllOf` on a timer | Searching every object several times a second (e.g. to watch for game menus while a menu is open) stutters. | Cached lookups; search on button presses only. |
 | UI-only input mode with a controller | The game stopped processing controller buttons, so the mod could not read them. | Game-and-UI mode when opened with the controller (`core/ui/input.lua`). |
 | A key press that arrives only as its release | In Valor Mortis the first A after the menu opened never showed as down in `IsInputKeyDown` (CommonUI took the press); several fixes changed how the press was read and missed it, because the log only had whole seconds and no release flag. | Log every key edge with `WasInputKeyJustReleased` and millisecond times before changing input code; act on releases, checked every frame (`Input.WatchReleases`). |
-| `LoopAsync` | Async loops next to game-thread hooks corrupted the Lua state (random crashes, per the Cheat Menu's notes). | One `LoopInGameThreadWithDelay` loop. |
+| `LoopAsync` | Async loops next to game-thread hooks corrupt the Lua state (random crashes). | One `LoopInGameThreadWithDelay` loop. |
 | Our value taken for vanilla | A saved attribute changed by a cheat came back after a load looking like the game's own value. | Saved values go through the ledger (`core/ledger.lua`). |
 | Resetting state that outlives the world | Re-reading a game asset's "original" values after a map change would have read our scaled ones. | Track assets by address instead of resetting them (`features/health.lua`, fall curve). |
 | An old object still valid after a load | The previous HUD stayed valid next to the new one for a while. | Check the owner, prefer the player's own (`Unreal.FindRanked`). |
@@ -112,8 +112,6 @@ end)
 | Loading-screen characters | A pawn exists before the real player does. | Check the player's class, not just "a pawn exists". |
 
 ## 7. Reviewing someone else's mod before installing it
-
-What we did for the Cheat Menu, Passive Health Regen and Defense Multiplier:
 
 - **Lua mods:** read the scripts. Search for `os.execute`, `io.popen`, `loadstring`, `load(`, `dofile`, `package.loadlib`, `require` of unknown modules, URLs, and long encoded strings. Check that `io.open` only writes inside the mod's own folder.
 - **DLLs:** compare with the official release (hash, or byte-diff for repacks), check the signature status, and scan with Microsoft Defender (`MpCmdRun.exe -Scan -ScanType 3 -File <path>`).

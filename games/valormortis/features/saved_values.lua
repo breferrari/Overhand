@@ -1,7 +1,6 @@
 -- games/valormortis/features/saved_values.lua
 -- Checked once after every load: attribute values the game saved while a cheat was on.
 
-local Unreal = require("core.unreal")
 local Log = require("core.log")
 local Override = require("core.override")
 local Ledger = require("core.ledger")
@@ -19,45 +18,6 @@ local LEDGER_ATTRIBUTES = {
     StaminaDodgeCostMultiplier = { set = "Stamina", cheatOn = function() return (App.settings.staminaCost or 1) ~= 1 end },
     StaminaBlockCostMultiplier = { set = "Stamina", cheatOn = function() return (App.settings.staminaCost or 1) ~= 1 end },
 }
-
-local function defaultBaseValue(className, attributeName)
-    local defaults = Unreal.Static("/Script/MinotaurCore.Default__" .. className)
-    local value = defaults and Unreal.TryNumber(function() return defaults[attributeName].BaseValue end)
-    if value and value >= 0.05 and value <= 20 then return value end
-    return 1
-end
-
--- Valor Mortis Cheat Menu 1.1.0 and older wrote One-Hit Kills (x1000) and the Damage Multiplier
--- (up to x10) into the saved damage multipliers. The game never changes their base value itself
--- (weapon and gem bonuses are effects on top), so a base of 1.4x the game's default or more can only
--- come from that and is put back to the default. Active bonuses are kept.
-local DAMAGE_MULTIPLIERS = {
-    { set = "Melee", className = "MeleeAttributeSet", attribute = "MeleeDamageMultiplier" },
-    { set = "Ranged", className = "RangedAttributeSet", attribute = "RangedDamageMultiplier" },
-}
-
--- Returns false (and repairs nothing) while a damage attribute set is not readable yet.
-local function repairDamageMultipliers()
-    local found = {}
-    for index, multiplier in ipairs(DAMAGE_MULTIPLIERS) do
-        local set = Game.AttributeSet(multiplier.set)
-        local base = set and Gas.GetBaseValue(set, multiplier.attribute)
-        if not base then return false end
-        found[index] = { set = set, base = base }
-    end
-    local repaired = 0
-    for index, multiplier in ipairs(DAMAGE_MULTIPLIERS) do
-        local set, base = found[index].set, found[index].base
-        local default = defaultBaseValue(multiplier.className, multiplier.attribute)
-        if base >= default * 1.4 then
-            Gas.SetBaseValueKeepModifiers(set, multiplier.attribute, default)
-            Log.Info("repaired " .. multiplier.attribute .. ": " .. base .. " -> " .. default)
-            repaired = repaired + 1
-        end
-    end
-    if repaired > 0 then App.status = "Repaired your damage values (left over from an old cheat menu)" end
-    return true
-end
 
 -- Returns false while an attribute set in the ledger is not readable yet (try again later).
 local function restoreLedgerValues()
@@ -88,14 +48,9 @@ local function restoreLedgerValues()
     return allChecked
 end
 
--- Returns true once everything could be checked (the caller retries until then); each part runs
--- once per world.
-local repairDone = false
+-- Returns true once everything could be checked (the caller retries until then).
 function SavedValues.Check()
-    repairDone = repairDone or repairDamageMultipliers()
-    return restoreLedgerValues() and repairDone
+    return restoreLedgerValues()
 end
-
-Unreal.OnWorldReset(function() repairDone = false end)
 
 return SavedValues

@@ -1,6 +1,6 @@
 -- games/valormortis/features/teleport.lua
 -- Up to 5 saved positions, kept per area, in teleports.txt (one line per slot:
--- slot|map|x|y|z|yaw|name, the Valor Mortis Cheat Menu's format).
+-- slot|map|x|y|z|yaw|name).
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")

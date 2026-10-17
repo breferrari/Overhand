@@ -5,8 +5,6 @@
     "projectFolder": "ValorMortis",
     "processName": "ValorMortis*",
     "usesGas": true,
-    "replacesMods": ["ValorCheatMenu", "PassiveHealthRegen"],
-    "previousModFolders": ["ValorianSheet"],
     "smokeTest": {
         "controllerClass": "BP_PlayerController_C",
         "playerClass": "BP_PlayerCharacter_C",

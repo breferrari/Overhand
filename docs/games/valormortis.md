@@ -95,7 +95,7 @@ From Valor Mortis Cheat Menu 1.4.0's findings (BryanHudson), reimplemented; **no
 - Its C++ cheat functions (`GodMode`, `NoClip`, ...) are empty in the release build, and its `Cheat.*` console variables don't exist.
 - Its Blueprint cheat actions (`CheatActions`, by `ActionName`) work: "Unlock Grappling", "Unlock Stasis", "Unlock Neptho Interactions", "Unlock Leveling Up", "Unlock all gems".
 - `IgnoreCostsToggle` works (state in the `AbilitySystem.IgnoreCosts` CVar).
-- Weapon fields: `PlayerSaber`, `WeaponPistol`, `WeaponFlamethrower`, `WeaponRifle`, `WeaponClaymore`, `WeaponBlunderbuss`, `WeaponShield`, `WeaponRapier`, `WeaponStasis` (`player:AcquireWeapon(weapon, true)`). **`WeaponGrenade` (Crystal Grenade) is an unfinished leftover**: it does nothing and takes the Claymore's wheel slot; Overhand removes it from saves (`RangedWeapons`, `MeleeWeapons`, `TwoHandedWeapons`).
+- Weapon fields: `PlayerSaber`, `WeaponPistol`, `WeaponFlamethrower`, `WeaponRifle`, `WeaponClaymore`, `WeaponBlunderbuss`, `WeaponShield`, `WeaponRapier`, `WeaponStasis` (`player:AcquireWeapon(weapon, true)`). **`WeaponGrenade` (Crystal Grenade) is an unfinished leftover**: it does nothing and takes the Claymore's wheel slot, so Unlock All Weapons leaves it out.
 - `UpgradeMaterials`: a tag container of the upgrade materials.
 
 ## HUD and menus
@@ -111,12 +111,3 @@ From Valor Mortis Cheat Menu 1.4.0's findings (BryanHudson), reimplemented; **no
 - **UI-only input mode stops controller buttons from reaching the game** (and so `IsInputKeyDown`), **confirmed in game**. A controller-opened menu uses game-and-UI mode.
 - The game uses **CommonUI**: the viewport client is `CommonGameViewportClient` and its action router is `MTUIActionRouterBase`, **confirmed in game**. `WBP_PayOff_C` and `WBP_Dialogue_C` stay activated (hidden) during normal play.
 - **The first A after our menu opens reaches the player controller only as a release**, **confirmed in game** (2026-10-17): `IsInputKeyDown` never turns true for that press, but `WasInputKeyJustReleased` is true for one frame. Later A presses arrive normally, and other buttons (RB, D-pad) are never affected. Nothing hookable runs on that press (no `UserWidget` key or focus event, no CommonUI button, no input-mode change), so the press is taken natively, most likely by CommonUI as Accept. The menu acts on A's release and counts a release whose press it never saw, checked every frame (`Input.WatchReleases`); **fix confirmed in game**.
-
-## Other mods for this game
-
-| Mod | Overhand | Notes |
-|---|---|---|
-| Valor Mortis Cheat Menu 1.4.0 (BryanHudson) | replaces it (switched off on install) | Basis of several features; its per-tick object searches caused stutter (1.4.0 adds more: weapon data every 3 s). Versions 1.1.0 and older wrote damage multipliers into saves (Overhand repairs them); 1.0.x stacked Max Health into saves (not something Overhand ever did). |
-| Passive Health Regen (AeonGreyh) | replaces it | Its approach is reimplemented for Health Regeneration. |
-| Defense Multiplier (AeonGreyh) | approach reimplemented for Damage Taken | |
-| UE4SS repack on Nexus | use the official build | Its Lua files and `dwmapi.dll` matched the official build (the DLL differed only in its build header); its `UE4SS.dll` came from an older experimental build no longer downloadable, so it could not be matched. We installed the official build instead. |

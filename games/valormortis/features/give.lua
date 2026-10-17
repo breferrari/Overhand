@@ -5,7 +5,6 @@ local Unreal = require("core.unreal")
 local Log = require("core.log")
 local Game = require("game.game")
 local App = require("core.app")
-local Hud = require("game.features.hud")
 local Resources = require("game.features.resources")
 local DevActions = require("game.features.dev_actions")
 local Gas = require("gas.gas")
@@ -181,13 +180,11 @@ end
 -- Weapons, abilities, gems
 -- The weapons in the cheat manager that are really in the game. "WeaponGrenade" (Crystal Grenade) is
 -- an unfinished leftover: it does nothing and takes the Claymore's place on the weapon wheel, so it
--- is left out and removed from saves that got it from older cheat menu versions.
+-- is left out.
 -- ---------------------------------------------------------------------------
 
 local WEAPON_FIELDS = { "PlayerSaber", "WeaponPistol", "WeaponFlamethrower", "WeaponRifle",
     "WeaponClaymore", "WeaponBlunderbuss", "WeaponShield", "WeaponRapier", "WeaponStasis" }
-local BROKEN_WEAPON_FIELDS = { "WeaponGrenade" }
-local WEAPON_LISTS = { "RangedWeapons", "MeleeWeapons", "TwoHandedWeapons" }
 
 function Give.AllWeapons()
     local player, cheatManager = Game.Player(), Game.CheatManager()
@@ -205,62 +202,6 @@ function Give.AllWeapons()
         end
     end
     App.status = "Unlocked " .. unlocked .. " weapons"
-end
-
--- Removes the broken leftover weapons from the player's weapon lists. A list is only rebuilt after a
--- test append proved this UE4SS version can grow arrays, so a list is never left emptied.
--- Returns true once the check could run (player and cheat manager present).
-function Give.RemoveBrokenWeapons()
-    local player, cheatManager = Game.Player(), Game.CheatManager()
-    if not player or not cheatManager then return false end
-    local brokenByAddress = {}
-    for _, field in ipairs(BROKEN_WEAPON_FIELDS) do
-        local weapon = try(function() return cheatManager[field] end)
-        if isValid(weapon) then brokenByAddress[Unreal.AddressOf(weapon)] = field end
-    end
-    if next(brokenByAddress) == nil then return true end
-
-    local cleanedLists = 0
-    for _, listName in ipairs(WEAPON_LISTS) do
-        Log.Guarded("clean " .. listName, function()
-            local weapons = player[listName]
-            local kept, foundBroken = {}, false
-            weapons:ForEach(function(_, element)
-                local weapon = element:get()
-                if isValid(weapon) and brokenByAddress[Unreal.AddressOf(weapon)] then
-                    foundBroken = true
-                else
-                    kept[#kept + 1] = weapon
-                end
-            end)
-            if not foundBroken then return end
-            local count = weapons:GetArrayNum()
-            local canGrow = try(function()
-                weapons[count + 1] = kept[1] or weapons[1]
-                return weapons:GetArrayNum() == count + 1
-            end)
-            if not canGrow then
-                Log.Info("could not remove the Crystal Grenade from " .. listName .. " (array cannot grow)")
-                return
-            end
-            weapons:Empty()
-            for index, weapon in ipairs(kept) do weapons[index] = weapon end
-            Log.Info(listName .. ": removed the Crystal Grenade, " .. #kept .. " weapons kept")
-            cleanedLists = cleanedLists + 1
-        end)
-    end
-
-    -- never leave the broken weapon in his hand
-    local equipped = try(function() return player.CurrentRangedWeapon end)
-    if isValid(equipped) and brokenByAddress[Unreal.AddressOf(equipped)] then
-        local pistol = try(function() return cheatManager.WeaponPistol end)
-        if isValid(pistol) then try(function() player:EquipRangedWeapon(pistol, false, true, true) end) end
-    end
-    if cleanedLists > 0 then
-        Hud.RefreshWeapons()
-        App.status = "Removed the broken Crystal Grenade from your weapon wheel"
-    end
-    return true
 end
 
 function Give.AllAbilities()

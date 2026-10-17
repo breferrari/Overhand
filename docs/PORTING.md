@@ -62,8 +62,6 @@ Inside the game folder, require its own modules as `game.*` (it is installed as 
     "projectFolder": "AtomicHeart",
     "processName": "AtomicHeart*",
     "usesGas": false,
-    "replacesMods": [],
-    "previousModFolders": [],
     "smokeTest": {
         "controllerClass": "<PlayerControllerClass>",
         "playerClass": "<PlayerCharacterClass>",

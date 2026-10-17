@@ -2,9 +2,9 @@
 
 ## 1.6.0 (2026-10-17)
 
-New (following Valor Mortis Cheat Menu 1.4.0's findings, reimplemented the Overhand way: no timed object searches, saved values through the ledger, everything back to vanilla when off; **not yet tested in game**):
+New (following Valor Mortis Cheat Menu 1.4.0's findings, reimplemented: no timed object searches, saved values through the ledger, everything back to vanilla when off; **not yet tested in game**):
 - **Stamina Cost** 100–25 % for attacks, dodges and blocks, through the game's own cost multipliers (saved attributes, ledgered). Sprinting is unchanged.
-- **Claymore Can Parry**: block-only weapon data allows parrying and the -10 parry penalty of two-handed weapons is lifted. The weapon data is looked up when the melee weapon changes (1.4.0 searches every 3 s).
+- **Claymore Can Parry**: block-only weapon data allows parrying and the -10 parry penalty of two-handed weapons is lifted. The weapon data is looked up when the melee weapon changes.
 - **Every Block Is A Perfect Parry** now works with two-handed weapons too (it lifts the same penalty).
 - **Infinite Ammo → still reload**: the reserve stays full, the clip is left to the game.
 - **Keep Catalysts On Death** also gives back catalysts lost on deaths that leave no deathmark.
@@ -13,6 +13,7 @@ New (following Valor Mortis Cheat Menu 1.4.0's findings, reimplemented the Overh
 - **Quests** tab (read only): your active quests and what the current step asks for, and *Write quest report* (`Overhand-Quests.txt`: the quests' structure by reflection, to build a quest helper that knows which items a step needs).
 
 Install:
+- **Overhand stands on its own**: installing no longer switches other mods off (or back on when uninstalling) and no longer takes settings from an earlier folder name; the repairs of values older cheat menus left in saves (damage multipliers, the Crystal Grenade on the weapon wheel) are gone.
 - **The installer finds the game** in Steam libraries, Xbox app / Game Pass folders on any drive, Epic Games and GOG installs, and UE4SS in it (`ue4ss\Mods` or older UE4SS's `Mods`, under `Binaries\Win64` or `WinGDK`). The manifest names the game's folders instead of one PC's path; `-GameDir` accepts the install, its `Content` folder or `Binaries\Win64`, and is needed only when the game isn't found or is installed twice.
 
 Fixes:
