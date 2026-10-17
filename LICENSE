@@ -31,3 +31,7 @@ approach (raising the resistance attributes) follow AeonGreyh's
 Passive Health Regen and Defense Multiplier. They are reimplemented here; no
 code of those mods is included, and this license grants nothing on AeonGreyh's
 behalf.
+
+The fonts in assets/fonts (Cinzel, Barlow Semi Condensed) are licensed under the
+SIL Open Font License 1.1, not under the MIT License above; their license texts
+are next to them.

@@ -8,7 +8,7 @@ Press **F5** (or **L3 + R3** on a controller), pick a tab, change a value. Every
 
 <p align="center"><img src="docs/images/menu.png" width="480" alt="The Overhand menu in Valor Mortis"></p>
 
-Every row says what it does while it's selected, rows changed from vanilla carry a red mark (and each tab counts them), and the footer shows only the buttons that do something on the selected row. Each game brings its own theme; this is Valor Mortis'. (The image is the design; in game the menu uses the engine's font.)
+Every row says what it does while it's selected, rows changed from vanilla carry a red mark (and each tab counts them), and the footer shows only the buttons that do something on the selected row. Each game brings its own theme; this is Valor Mortis', set in Cinzel and Barlow Semi Condensed, which ship with the mod.
 
 One repo holds the shared framework and every supported game. Installing builds a mod for **one** game from only what that game needs.
 
@@ -56,8 +56,10 @@ Scripts\main.lua    src\main.lua
 Scripts\core\       src\core\
 Scripts\gas\        src\gas\           (only for games that use GAS)
 Scripts\game\       games\<game>\      (only that game)
-assets\             assets\            (the menu's mark)
+assets\             assets\            (the menu's mark, arrows, button disc, fonts)
 ```
+
+The menu's fonts also go into the game's Content folder (`<Game>\Content\Overhand\Fonts\*.ufont`): the engine reads a font file from there. `-Uninstall` removes them too.
 
 A game update or a Game Pass / Steam "repair" can remove UE4SS and the mod; install again afterwards. Your `settings.cfg` and teleports are kept across installs. The game's `manifest.json` lists other mods Overhand replaces (they are switched off, not deleted) and earlier folder names to take settings from.
 
@@ -127,6 +129,7 @@ For every game the smoke test assembles the mod the way the installer does, comp
 - Parts of the Valor Mortis cheat logic come from **Valor Mortis Cheat Menu** 1.3.2 by BryanHudson (MIT).
 - Valor Mortis Health Regeneration (healing through the game's attribute system, the combat check) and Damage Taken (raising resistances) follow **AeonGreyh**'s Passive Health Regen and Defense Multiplier, reimplemented here.
 - [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) by the UE4SS-RE team (MIT).
+- Fonts: [Cinzel](https://github.com/NDISCOVER/Cinzel) by Natanael Gama and [Barlow](https://github.com/jpt/barlow) by Jeremy Tribby, both under the SIL Open Font License 1.1 (`assets/fonts/`).
 
 ## License
 

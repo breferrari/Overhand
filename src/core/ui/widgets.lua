@@ -4,6 +4,9 @@
 
 local Unreal = require("core.unreal")
 local App = require("core.app")
+local Log = require("core.log")
+local Paths = require("core.paths")
+local Fonts = require("core.ui.fonts")
 
 local Widgets = {}
 
@@ -99,12 +102,21 @@ end
 -- Without one, text uses the engine's default font (Roboto).
 Widgets.fonts = {}
 
--- A font spec is an object path ("/Game/UI/Fonts/F_Title.F_Title") or a list of name fragments
--- ({ "Cinzel", "Trajan" }) matched against the fonts the game has loaded, first fragment first.
-local function findFont(spec, loadedFonts)
+-- A font spec is one of:
+--   { faces = { Regular = "Cinzel-SemiBold", Bold = "Cinzel-Bold" } }  font files the installer put
+--       in the game's Content folder (core/ui/fonts.lua builds the font)
+--   "/Game/UI/Fonts/F_Title.F_Title"                                    a font the game has
+--   { "Cinzel", "Trajan" }                                              name fragments matched against
+--       the fonts the game has loaded, first fragment first
+local function findFont(role, spec, loadedFonts)
     if type(spec) == "string" then
         local font = Unreal.Static(spec)
         return Unreal.IsValid(font) and font or nil
+    end
+    if spec.faces then
+        local font, reason = Fonts.Build(role:sub(1, 1):upper() .. role:sub(2), spec.faces)
+        if not font then Log.Info("menu fonts: " .. role .. " stays on the engine font (" .. tostring(reason) .. ")") end
+        return font
     end
     for _, fragment in ipairs(spec) do
         for _, font in ipairs(loadedFonts) do
@@ -122,14 +134,34 @@ function Widgets.ResolveFonts(specs)
     if not specs then return Widgets.fonts end
     local loadedFonts
     for role, spec in pairs(specs) do
-        if type(spec) == "table" and not loadedFonts then loadedFonts = FindAllOf("Font") or {} end
-        Widgets.fonts[role] = findFont(spec, loadedFonts)
+        if type(spec) == "table" and not spec.faces and not loadedFonts then loadedFonts = FindAllOf("Font") or {} end
+        Widgets.fonts[role] = findFont(role, spec, loadedFonts)
     end
+    Log.Limited("menu fonts", 4, "menu fonts: display " .. (Widgets.fonts.display and "theme" or "engine")
+        .. ", body " .. (Widgets.fonts.body and "theme" or "engine"))
     return Widgets.fonts
 end
 
--- style (optional): { bold = true, spacing = 120 (thousandths of an em), display = true (the
---                     theme's display font instead of its body font), center = true, wrap = true }
+-- The typeface for a weight ("Regular", "Medium", "SemiBold", "Bold"). The theme's fonts have them
+-- all; the engine's Roboto only has Regular and Bold, so the others map to the nearest.
+local function typefaceFor(weight, display)
+    if Widgets.fonts[display and "display" or "body"] then return weight end
+    return (weight == "SemiBold" or weight == "Bold") and "Bold" or "Regular"
+end
+
+-- Changes a text's weight after it was built (the selected row's label).
+function Widgets.SetWeight(textBlock, weight, display)
+    try(function()
+        local font = textBlock.Font
+        font.TypefaceFontName = FName(typefaceFor(weight, display))
+        textBlock:SetFont(font)
+    end)
+end
+
+-- style (optional): { weight = "Medium" | "SemiBold" | "Bold" (default Regular),
+--                     display = true (the theme's display font instead of its body font),
+--                     spacing = 120 (thousandths of an em), lineHeight = 1.15 (of the font's own),
+--                     center = true, wrap = true }
 function Widgets.Text(tree, name, text, fontSize, color, style)
     style = style or {}
     local textBlock = Widgets.Construct("/Script/UMG.TextBlock", tree, name)
@@ -139,13 +171,14 @@ function Widgets.Text(tree, name, text, fontSize, color, style)
         local fontObject = style.display and Widgets.fonts.display or Widgets.fonts.body
         if fontObject then font.FontObject = fontObject end
         font.Size = fontSize
-        if style.bold then font.TypefaceFontName = FName("Bold") end
+        font.TypefaceFontName = FName(typefaceFor(style.weight or "Regular", style.display))
         if style.spacing then font.LetterSpacing = style.spacing end
         textBlock:SetFont(font)
     end)
     Widgets.SetTextColor(textBlock, color)
     if style.center then try(function() textBlock:SetJustification(1) end) end   -- ETextJustify::Center
     if style.wrap then try(function() textBlock:SetAutoWrapText(true) end) end
+    if style.lineHeight then try(function() textBlock.LineHeightPercentage = style.lineHeight end) end
     return textBlock
 end
 
@@ -251,20 +284,53 @@ function Widgets.KeyChip(tree, name, label)
     return edge
 end
 
+-- The menu's own images (white, tinted when drawn): assets/<name>.png in the mod folder, loaded
+-- once per build. A missing image leaves its widget to a fallback.
+local IMAGE_FILES = { arrowLeft = "assets/arrow-left.png", arrowRight = "assets/arrow-right.png", disc = "assets/disc.png" }
+Widgets.images = {}
+
+function Widgets.LoadImages(worldContext)
+    Widgets.images = {}
+    for key, file in pairs(IMAGE_FILES) do Widgets.images[key] = Widgets.TextureFromFile(Paths.InModFolder(file), worldContext) end
+end
+
+-- An image tinted with color, at width x height; nil when the texture is missing or will not set.
+function Widgets.TintedImage(tree, name, texture, width, height, color)
+    if not texture then return nil end
+    local box = Widgets.SizeBox(tree, name .. "Box", width, height)
+    local image = Widgets.Construct("/Script/UMG.Image", tree, name)
+    local ok = try(function() image:SetBrushFromTexture(texture, false) return true end)
+    if not ok then return nil end
+    Widgets.SetImageColor(image, color)
+    box:SetContent(image)
+    return box, image
+end
+
+function Widgets.SetImageColor(image, color) try(function() image:SetColorAndOpacity(color) end) end
+
 local FACE_BUTTON_COLORS = { A = "buttonA", B = "buttonB", X = "buttonX", Y = "buttonY" }
+local DISC_SIZE = 18
 
 -- A controller face button (A / B / X / Y) as a coloured disc with its letter; any other label is
 -- a key chip.
 function Widgets.ButtonChip(tree, name, label)
     local role = FACE_BUTTON_COLORS[label]
     if not role then return Widgets.KeyChip(tree, name, label) end
-    local box = Widgets.SizeBox(tree, name .. "Box", 18, 18)
-    local disc = Widgets.Border(tree, name .. "Disc", Widgets.COLORS[role])
-    Widgets.Round(disc, nil)
-    try(function() disc:SetHorizontalAlignment(Widgets.CENTER) end)
-    try(function() disc:SetVerticalAlignment(Widgets.CENTER) end)
-    disc:SetContent(Widgets.Text(tree, name .. "Label", label, 9, Widgets.COLORS.bright, { bold = true }))
-    box:SetContent(disc)
+    local letter = Widgets.Text(tree, name .. "Label", label, 9, Widgets.COLORS.bright, { weight = "SemiBold" })
+    local disc = Widgets.TintedImage(tree, name .. "Disc", Widgets.images.disc, DISC_SIZE, DISC_SIZE, Widgets.COLORS[role])
+    if disc then
+        local overlay = Widgets.Overlay(tree, name)
+        overlay:AddChild(disc)
+        Widgets.Align(overlay:AddChild(letter), Widgets.CENTER, Widgets.CENTER)
+        return overlay
+    end
+    local box = Widgets.SizeBox(tree, name .. "Box", DISC_SIZE, DISC_SIZE)
+    local square = Widgets.Border(tree, name .. "Square", Widgets.COLORS[role])
+    Widgets.Round(square, nil)
+    try(function() square:SetHorizontalAlignment(Widgets.CENTER) end)
+    try(function() square:SetVerticalAlignment(Widgets.CENTER) end)
+    square:SetContent(letter)
+    box:SetContent(square)
     return box
 end
 

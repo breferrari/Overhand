@@ -5,9 +5,14 @@
 return {
     subtitle = "VALOR MORTIS",
     mark = "assets/mark.png",   -- the blood handprint, in the mod folder
-    panelOpacity = 0.97,
-    -- The design's fonts, used if the game has them loaded (Misc > Find fonts lists what it has).
-    fonts = { display = { "Cinzel" }, body = { "Barlow" } },
+    panelOpacity = 1.0,
+    -- The design's typefaces (assets/fonts, SIL Open Font License), installed into the game's
+    -- Content folder by tools/install.ps1. Display: the title and section headings.
+    fonts = {
+        display = { faces = { Regular = "Cinzel-SemiBold", SemiBold = "Cinzel-SemiBold", Bold = "Cinzel-Bold" } },
+        body = { faces = { Regular = "BarlowSemiCondensed-Regular", Medium = "BarlowSemiCondensed-Medium",
+            SemiBold = "BarlowSemiCondensed-SemiBold", Bold = "BarlowSemiCondensed-SemiBold" } },
+    },
     palette = {
         panel = "#14100E",
         edge = "#3A302A",

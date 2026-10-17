@@ -6,12 +6,12 @@
 local Mock = {}
 local nextAddress = 1000
 
-local function newMock(className)
+local function newMock(className, invalid)
     nextAddress = nextAddress + 1
     local fields = { __className = className or "Mock", __address = nextAddress }
     local mock = {}
     local methods = {
-        IsValid = function() return true end,
+        IsValid = function() return not invalid end,
         GetAddress = function() return fields.__address end,
         GetFullName = function() return fields.__className .. " /Game/Mock." .. fields.__className end,
         GetClass = function()
@@ -19,7 +19,11 @@ local function newMock(className)
             rawset(class, "GetFName", function() return { ToString = function() return fields.__className end } end)
             return class
         end,
-        ForEach = function() end,
+        -- arrays are empty, except a font's typeface entries (core/ui/fonts.lua fills five, like Roboto)
+        ForEach = function(callback)
+            if fields.__className ~= "Fonts" then return end
+            for index = 1, 5 do callback(index, newMock("TypefaceEntry")) end
+        end,
         GetArrayNum = function() return 0 end,
         ToString = function() return fields.__className end,
         K2_GetActorLocation = function() return { X = 100.0, Y = 200.0, Z = 300.0 } end,
@@ -57,8 +61,13 @@ function FindAllOf(className)
     end
     return nil
 end
-function StaticFindObject(path) return newMock(path:match("([%w_]+)$") or "Static") end
+-- Objects the mod creates itself (its fonts under /Game/<mod>/) do not exist until it does.
+function StaticFindObject(path)
+    if path:find("^/Game/Overhand/") then return newMock("Missing", true) end
+    return newMock(path:match("([%w_]+)$") or "Static")
+end
 function StaticConstructObject() return newMock("Constructed") end
+function CreateInvalidObject() return newMock("Invalid") end
 function LoadAsset() end
 function FName(text) return { ToString = function() return text end } end
 function FText(text) return text end

@@ -214,7 +214,8 @@ end
 local function miscTab()
     return {
         Menu.Action("Turn everything off", turnEverythingOff, { confirm = "Sets every cheat back to vanilla.", anytime = true,
-            description = "Every cheat back to vanilla. Debug logging stays as it is." }),
+            description = "Every cheat back to vanilla. Menu settings (theme fonts, debug logging) stay as they are." }),
+        Menu.ThemeFontsToggle(),
         Menu.Toggle("Debug logging", "debugLogging",
             { description = "Writes more detail to " .. App.name .. ".log, for bug reports." }),
         Menu.Action("Write bug report", BugReport.Write, { anytime = true, description =

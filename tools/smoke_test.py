@@ -34,8 +34,9 @@ def load_manifest(game: str) -> dict:
 
 
 def assemble(game: str, manifest: dict, into: pathlib.Path) -> pathlib.Path:
-    """The installed mod folder, as tools/install.ps1 builds it."""
-    mod = into / manifest["modName"]
+    """The installed mod folder, as tools/install.ps1 builds it, inside a game folder laid out like
+    the real one (so the mod finds its fonts in the game's Content folder)."""
+    mod = into / pathlib.PureWindowsPath(manifest["modsPath"]).as_posix() / manifest["modName"]
     scripts = mod / "Scripts"
     scripts.mkdir(parents=True)
     shutil.copy(SOURCE / "main.lua", scripts)
@@ -44,6 +45,11 @@ def assemble(game: str, manifest: dict, into: pathlib.Path) -> pathlib.Path:
         shutil.copytree(SOURCE / "gas", scripts / "gas")
     shutil.copytree(GAMES / game, scripts / "game", ignore=shutil.ignore_patterns("manifest.json"))
     shutil.copytree(REPO / "assets", mod / "assets")
+    if manifest.get("contentPath"):
+        fonts = into / pathlib.PureWindowsPath(manifest["contentPath"]).as_posix() / manifest["modName"] / "Fonts"
+        fonts.mkdir(parents=True)
+        for font in (REPO / "assets" / "fonts").glob("*.ttf"):
+            shutil.copy(font, fonts / (font.stem + ".ufont"))
     return mod
 
 

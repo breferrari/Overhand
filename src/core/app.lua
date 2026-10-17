@@ -15,16 +15,19 @@ local App = {
 
 -- definition: { name, version, menuTitle, settings = { key = default, ... },
 --               sessionOnly = { key = true }, notACheat = { key = true }, status }
--- Every app gets a debugLogging setting (core/log.lua reads it).
+-- Every app gets a debugLogging setting (core/log.lua reads it) and a themeFonts setting (the
+-- menu's own fonts, core/ui/menu.lua); neither is a cheat.
 function App.Define(definition)
     App.name = definition.name
     App.version = definition.version
     App.menuTitle = definition.menuTitle or definition.name:upper()
     App.settings = definition.settings
     App.settings.debugLogging = App.settings.debugLogging or false
+    if App.settings.themeFonts == nil then App.settings.themeFonts = true end
     App.sessionOnly = definition.sessionOnly or {}
     App.notACheat = definition.notACheat or {}
     App.notACheat.debugLogging = true
+    App.notACheat.themeFonts = true
     App.status = definition.status or ""
     App.defaults = {}
     for key, value in pairs(App.settings) do App.defaults[key] = value end
