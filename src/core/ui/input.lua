@@ -48,7 +48,9 @@ local MENU_BUTTONS = {
     { key = "Gamepad_DPad_Down", command = "down", repeats = true },
     { key = "Gamepad_DPad_Left", command = "left", repeats = true },
     { key = "Gamepad_DPad_Right", command = "right", repeats = true },
-    { key = "Gamepad_FaceButton_Bottom", command = "enter" },
+    -- A acts when released: acting while it was held showed the result one press late, the first
+    -- time after the menu opened (the game also gets A in game-and-UI mode).
+    { key = "Gamepad_FaceButton_Bottom", command = "enter", onRelease = true },
     { key = "Gamepad_FaceButton_Right", command = "close" },
     { key = "Gamepad_LeftShoulder", command = "previousTab" },
     { key = "Gamepad_RightShoulder", command = "nextTab" },
@@ -76,7 +78,11 @@ function Input.PollController(menuOpen)
     end
     local now = os.clock()
     for _, button in ipairs(MENU_BUTTONS) do
-        if Unreal.IsKeyDown(controller, button.key) then
+        local down = Unreal.IsKeyDown(controller, button.key)
+        if button.onRelease then
+            if not down and held[button.key] then queueFromController(button.command) end
+            held[button.key] = down or nil
+        elseif down then
             local nextRepeatAt = held[button.key]
             if not nextRepeatAt then
                 queueFromController(button.command)
