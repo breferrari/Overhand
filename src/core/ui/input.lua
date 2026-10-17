@@ -122,6 +122,9 @@ function Input.BlockGame(withController)
     try(function() controller:SetIgnoreMoveInput(true) end)
     local widgetLibrary = Unreal.WidgetLibrary()
     local changed = withController and setGameAndUi(widgetLibrary, controller) or setUiOnly(widgetLibrary, controller)
+    -- With the controller, the game viewport gets the focus: a game widget that still had it took the
+    -- first A press as Slate's "Accept", so the player controller (which we read) never saw it.
+    if withController then try(function() widgetLibrary:SetFocusToGameViewport() end) end
     blocked = { player = player, controller = controller, changedInputMode = changed == true }
 end
 

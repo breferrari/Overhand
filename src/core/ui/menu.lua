@@ -413,14 +413,14 @@ local function buildChoice(tree, name, item)
         try(function() chevron:SetRenderTransformAngle(90.0) end)   -- the right arrow turned down
         addCentered(line, chevron)
         local box = Widgets.SizeBox(tree, name .. "ChoiceBox", nil, nil, CONTROL_WIDTH)
-        Widgets.Align(box:SetContent(line), END, CENTER)   -- against the right edge, like the other controls
+        Widgets.Align(box:SetContent(line), END, CENTER)
         return box, { value = value }
     end
     addCentered(line, buildArrow(tree, name .. "Left", "arrowLeft", "‹"))
     addCentered(line, valueBox, 8, 8)
     addCentered(line, buildArrow(tree, name .. "Right", "arrowRight", "›"))
     local box = Widgets.SizeBox(tree, name .. "ChoiceBox", nil, nil, CONTROL_WIDTH)
-    box:SetContent(line)
+    Widgets.Align(box:SetContent(line), END, CENTER)   -- ▸, ▾ and the toggles end in one column
     return box, { value = value }
 end
 
@@ -897,6 +897,10 @@ local function drawTabCounts()
     end
 end
 
+local function invalidateLayout(widgets)
+    for _, widget in ipairs(widgets) do try(function() widget:InvalidateLayoutAndVolatility() end) end
+end
+
 -- What the selected row does; while an action waits for its second press, what it will do and how
 -- to confirm (in the accent colour).
 local function drawDescription(item)
@@ -908,7 +912,11 @@ local function drawDescription(item)
     setVisible(shown, "bodyVisible", description.bodyBox, not listOpen)
     if changed(shown, "pickerVisible", listOpen) then
         Widgets.SetVisible(description.picker.box, listOpen)
-        if listOpen then try(function() description.picker.box:ForceLayoutPrepass() end) end
+        -- Showing a widget that started hidden did not always repaint it: the list opened (the log
+        -- said so) but showed only after the next change. So its layout is invalidated now and
+        -- once more on the next tick.
+        invalidateLayout({ description.picker.box, description.box })
+        view.invalidateNextTick = { description.picker.box, description.box }
     end
     setText(shown, "descriptionPosition", description.position, listOpen and drawPicker(description.picker, view.list) or "")
     if listOpen then return end
@@ -1106,6 +1114,10 @@ function Menu.Tick()
             close(gameMenu)
             return
         end
+    end
+    if view.invalidateNextTick then
+        invalidateLayout(view.invalidateNextTick)
+        view.invalidateNextTick = nil
     end
     if App.status ~= view.shown.status or os.clock() >= view.nextRefreshAt then
         view.nextRefreshAt = os.clock() + REFRESH_INTERVAL

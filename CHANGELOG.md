@@ -10,7 +10,7 @@ New (following Valor Mortis Cheat Menu 1.4.0's findings, reimplemented the Overh
 - **Keep Catalysts On Death** also gives back catalysts lost on deaths that leave no deathmark.
 - **Free Respec**: the lantern's respec costs are 0 while on (a game asset, restored when off; checked every 2 s, not every tick).
 - **Give Item → Quest Items**, with a warning in the description.
-- **Quests** tab (read only): every quest with its state and current step, in a dropdown.
+- **Quests** tab (read only): your active quests and what the current step asks for, and *Write quest report* (`Overhand-Quests.txt`: the quests' structure by reflection, to build a quest helper that knows which items a step needs).
 
 Fixes:
 - **Instant Sprint** only on the ground (in the air it steered away the momentum of jumps and swings).
