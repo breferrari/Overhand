@@ -120,10 +120,9 @@ The smoke test assembles each game's mod like the installer, compiles it with Lu
 
 ## Credits
 
-- Parts of the Valor Mortis cheat logic come from **Valor Mortis Cheat Menu** 1.3.2 by BryanHudson (MIT), and several 1.6.0 features follow its 1.4.0 findings, reimplemented.
-- Valor Mortis Health Regeneration (healing through the game's attribute system, the combat check) and Damage Taken (raising resistances) follow **AeonGreyh**'s Passive Health Regen and Defense Multiplier, reimplemented here.
-- [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) by the UE4SS-RE team (MIT).
-- Fonts: [Cinzel](https://github.com/NDISCOVER/Cinzel) by Natanael Gama and [Barlow](https://github.com/jpt/barlow) by Jeremy Tribby, both under the SIL Open Font License 1.1 (`assets/fonts/`).
+- Valor Mortis cheats build on **Valor Mortis Cheat Menu** by BryanHudson and on **AeonGreyh**'s Passive Health Regen and Defense Multiplier.
+- [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) by the UE4SS-RE team.
+- Fonts: [Cinzel](https://github.com/NDISCOVER/Cinzel) and [Barlow](https://github.com/jpt/barlow), SIL Open Font License.
 
 ## License
 
