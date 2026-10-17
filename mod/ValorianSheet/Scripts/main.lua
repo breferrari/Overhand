@@ -1,11 +1,9 @@
 -- main.lua
--- Entry point (UE4SS loads Scripts/main.lua). Loads the game's module, which defines the app and
--- registers its features and menu, then drives everything from one game-thread loop.
+-- Entry point (UE4SS loads Scripts/main.lua). Loads the game (game/init.lua), which defines the app
+-- and registers its features and menu, then drives everything from one game-thread loop.
 -- Layout and rules: docs/ARCHITECTURE.md. Bringing the menu to another game: docs/PORTING.md.
 
-local GAME = "valormortis"   -- games/<GAME>/init.lua
-
-require("games." .. GAME .. ".init")
+require("game.init")
 
 local Log = require("core.log")
 local Settings = require("core.settings")

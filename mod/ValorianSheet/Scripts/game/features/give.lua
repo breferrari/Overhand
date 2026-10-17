@@ -1,13 +1,13 @@
--- games/valormortis/features/give.lua
+-- game/features/give.lua
 -- One-shot gifts: catalysts, upgrade materials, consumables, a chosen item, weapons, abilities, gems.
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
-local Game = require("games.valormortis.game")
+local Game = require("game.game")
 local App = require("core.app")
-local Hud = require("games.valormortis.features.hud")
-local Resources = require("games.valormortis.features.resources")
-local DevActions = require("games.valormortis.features.dev_actions")
+local Hud = require("game.features.hud")
+local Resources = require("game.features.resources")
+local DevActions = require("game.features.dev_actions")
 local Gas = require("gas.gas")
 
 local Give = {}

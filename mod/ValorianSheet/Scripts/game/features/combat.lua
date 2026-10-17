@@ -1,10 +1,10 @@
--- games/valormortis/features/combat.lua
+-- game/features/combat.lua
 -- Combat state, Every Block Is A Perfect Parry, Parry Window, Dodge Window and Kill All Enemies Nearby.
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
 local Override = require("core.override")
-local Game = require("games.valormortis.game")
+local Game = require("game.game")
 local App = require("core.app")
 local Gas = require("gas.gas")
 

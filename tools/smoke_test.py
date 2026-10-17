@@ -27,7 +27,7 @@ def check_layers() -> list[str]:
     """core/ knows no game and no GAS; gas/ knows no game (so both carry over to another game)."""
     errors = []
     scripts = MOD / "Scripts"
-    forbidden = {"core": ("games.", "gas."), "gas": ("games.",)}
+    forbidden = {"core": ("game.", "gas."), "gas": ("game.",)}
     for layer, prefixes in forbidden.items():
         for path in sorted((scripts / layer).rglob("*.lua")):
             text = path.read_text(encoding="utf-8")

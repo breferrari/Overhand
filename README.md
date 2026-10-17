@@ -87,9 +87,9 @@ The menu does no work while it's closed beyond reading a key queue, and cheats t
 
 ## How it works
 
-The code is in three layers: `core/` (the menu, input, settings, safe Unreal access, the per-tick loop) and `gas/` (Gameplay Ability System helpers) know no game; `games/valormortis/` is everything Valor Mortis. Each cheat is a small feature module with a tick that applies your settings; the menu only writes settings. Layout and rules: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+The code is in three layers: `core/` (the menu, input, settings, safe Unreal access, the per-tick loop) and `gas/` (Gameplay Ability System helpers) know no game; `game/` is everything Valor Mortis. Each cheat is a small feature module with a tick that applies your settings; the menu only writes settings. Layout and rules: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-**Another game?** `core/` and `gas/` carry over as they are; a new game is a new `games/<name>/` folder. Guide (with Atomic Heart as the example): [docs/PORTING.md](docs/PORTING.md).
+**Another game?** Copy the repo and replace `game/`: `core/` and `gas/` carry over as they are. Guide (with Atomic Heart as the example): [docs/PORTING.md](docs/PORTING.md).
 
 ## Development
 

@@ -1,4 +1,4 @@
--- games/valormortis/features/buffs.lua
+-- game/features/buffs.lua
 -- Infinite Buffs: potions, weapon coatings and pistol boosts never run out.
 -- Every active buff gets a very long duration; the old one comes back when the cheat is switched
 -- off. Buffs are saved with their remaining time, so after a load with the cheat off, buffs that
@@ -9,9 +9,9 @@
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
-local Game = require("games.valormortis.game")
+local Game = require("game.game")
 local App = require("core.app")
-local Hud = require("games.valormortis.features.hud")
+local Hud = require("game.features.hud")
 local Gas = require("gas.gas")
 
 local Buffs = {}

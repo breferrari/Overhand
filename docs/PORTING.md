@@ -1,6 +1,6 @@
 # Bringing the menu to another game
 
-`core/` (menu, input, settings, logging, lookups, overrides, the per-tick loop) and `gas/` know no game. A new game is a new folder next to `games/valormortis/` plus a one-word change in `main.lua`. This guide uses **Atomic Heart** as the example.
+`core/` (menu, input, settings, logging, lookups, overrides, the per-tick loop) and `gas/` know no game; everything game-specific is in `game/`. A new game is **a copy of this repo with a new `game/`**: keep `core/`, `gas/` and `tools/`, replace `game/`. This guide uses **Atomic Heart** as the example.
 
 ## What carries over, what doesn't
 
@@ -10,7 +10,7 @@
 | `gas/` | As is, **if** the game uses Unreal's Gameplay Ability System. Many UE games do; Atomic Heart is not known to (its stats are likely on its own components). Without GAS, leave `gas/` unused. |
 | `tools/smoke_test.py`, `tools/ue4ss_mock.lua` | As is; the mock's player class names change (see Test). |
 | `tools/install.ps1` | New game path and folder name. |
-| `games/valormortis/` | Not reused: it is Valor Mortis' class names, attributes and cheats. Use it as the pattern. |
+| `game/` | Replaced: it is Valor Mortis' class names, attributes and cheats. Keep the copy's old `game/` around as the pattern while writing the new one. |
 
 The real work for a new game is **finding its internals**: which class is the player and his controller, where health and stamina live, which functions deal damage, which widgets are its menus. The framework saves everything else.
 
@@ -34,11 +34,13 @@ Turn on UE4SS's console and object dumper (`UE4SS-settings.ini`: `ConsoleEnabled
 | Game menus | `WBP_PauseMenu_C`, ... | the pause / inventory widget classes |
 | Developer cheats | `BP_MTCheatManager` | `CheatManager` subclass, if any |
 
-### 2. Create `games/atomicheart/`
+### 2. Copy the repo and write a new `game/`
+
+Copy the repository (e.g. `C:\Dev\HeartSheet`), rename the mod folder (`mod/HeartSheet/`), and replace the contents of `Scripts/game/`:
 
 ```
-games/atomicheart/
-  init.lua      wiring (copy valormortis/init.lua and trim)
+game/
+  init.lua      wiring (start from the old init.lua and trim)
   app.lua       App.Define: name, version, menu title, settings with vanilla values
   game.lua      Controller(), Player(), and whatever access the cheats need
   sheet.lua     the menu tabs
@@ -77,13 +79,13 @@ return Game
 **`init.lua`**: the part that connects the game to core.
 
 ```lua
-require("games.atomicheart.app")
+require("game.app")
 local Runner = require("core.runner")
 local Menu = require("core.ui.menu")
-local Game = require("games.atomicheart.game")
+local Game = require("game.game")
 
 Runner.Configure({ identity = Game.Player })
-Runner.AddFeature("survival", require("games.atomicheart.features.survival").Tick)
+Runner.AddFeature("survival", require("game.features.survival").Tick)
 
 Menu.Configure({
     controller = Game.Controller,
@@ -93,20 +95,16 @@ Menu.Configure({
     buttonIcons = {},
 })
 
-require("games.atomicheart.sheet").Build()
+require("game.sheet").Build()
 ```
 
 For a GAS game also add `Gas.Configure({ abilitySystem = Game.AbilitySystem })` and `Runner.OnTickStart(Gas.BeginTick)`.
 
 **Features**: the same shape as Valor Mortis'. A tick function that reads `App.settings` and applies it, `Override` for values the game also writes (`Override:property(movement, "MaxWalkSpeed", factor)`), `Unreal.OnWorldReset` for per-world state.
 
-### 3. Point `main.lua` at it
+### 3. Install
 
-```lua
-local GAME = "atomicheart"
-```
-
-and install the mod folder into the game's `ue4ss\Mods\` (adapt `tools/install.ps1`).
+`main.lua` needs no change (it loads `game/init.lua`). Adapt `tools/install.ps1` (game path, mod folder name) and install into the game's `ue4ss\Mods\`.
 
 ### 4. Test
 

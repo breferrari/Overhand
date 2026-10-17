@@ -1,4 +1,4 @@
--- games/valormortis/sheet.lua
+-- game/sheet.lua
 -- What the menu shows: six tabs, each row bound to a setting or an action of a feature module.
 -- Actions need a loaded save unless marked { anytime = true }.
 
@@ -8,11 +8,11 @@ local Settings = require("core.settings")
 local BugReport = require("core.bug_report")
 local Menu = require("core.ui.menu")
 local IconFinder = require("core.ui.icon_finder")
-local Game = require("games.valormortis.game")
-local Combat = require("games.valormortis.features.combat")
-local Resources = require("games.valormortis.features.resources")
-local Give = require("games.valormortis.features.give")
-local Teleport = require("games.valormortis.features.teleport")
+local Game = require("game.game")
+local Combat = require("game.features.combat")
+local Resources = require("game.features.resources")
+local Give = require("game.features.give")
+local Teleport = require("game.features.teleport")
 
 local Sheet = {}
 

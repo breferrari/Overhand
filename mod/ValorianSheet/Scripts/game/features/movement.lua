@@ -1,12 +1,12 @@
--- games/valormortis/features/movement.lua
+-- game/features/movement.lua
 -- Movement Speed, Jump Height, Instant Sprint, Toggle Sprint, NoClip and Game Speed.
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
 local Override = require("core.override")
-local Game = require("games.valormortis.game")
+local Game = require("game.game")
 local App = require("core.app")
-local Shared = require("games.valormortis.shared")
+local Shared = require("game.shared")
 
 local Movement = {}
 

@@ -1,4 +1,4 @@
--- games/valormortis/game.lua
+-- game/game.lua
 -- Access to Valor Mortis itself: the player, his components and attribute sets, the world
 -- subsystems, items and the game's own developer cheat manager. Generic Unreal access is in
 -- core/unreal.lua, generic GAS access in gas/gas.lua. Every object lookup is cached for the current

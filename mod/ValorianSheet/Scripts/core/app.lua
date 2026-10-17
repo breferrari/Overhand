@@ -1,6 +1,6 @@
 -- core/app.lua
 -- The mod's identity and its settings, shared by core and the game. The game fills it in once with
--- App.Define (see games/<game>/app.lua); core only reads it.
+-- App.Define (see game/app.lua); core only reads it.
 
 local App = {
     name = "Mod",

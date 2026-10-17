@@ -1,4 +1,4 @@
--- games/valormortis/features/defense.lua
+-- game/features/defense.lua
 -- Damage Taken (the approach of AeonGreyh's Defense Multiplier): William's resistance attributes are
 -- raised so the game's own damage calculation lets through only the chosen share of every hit.
 -- A resistance r lets (1 - r) of the damage through; for a share s we write 1 - (1 - r) * s.
@@ -11,7 +11,7 @@
 local Unreal = require("core.unreal")
 local Log = require("core.log")
 local Override = require("core.override")
-local Game = require("games.valormortis.game")
+local Game = require("game.game")
 local App = require("core.app")
 local Gas = require("gas.gas")
 

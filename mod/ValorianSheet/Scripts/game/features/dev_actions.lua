@@ -1,10 +1,10 @@
--- games/valormortis/features/dev_actions.lua
+-- game/features/dev_actions.lua
 -- What still works of the developers' cheat manager: its Blueprint cheat actions (gems, ability
 -- unlocks) and the engine's ability-cost toggle (No Ability Costs).
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
-local Game = require("games.valormortis.game")
+local Game = require("game.game")
 local App = require("core.app")
 
 local DevActions = {}

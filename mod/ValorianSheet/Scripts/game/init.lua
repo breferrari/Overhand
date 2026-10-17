@@ -1,28 +1,28 @@
--- games/valormortis/init.lua
+-- game/init.lua
 -- Wires Valor Mortis into core: defines the app, registers the features and once-per-world checks
 -- with the runner, configures GAS and the menu, and adds the game's part of the bug report.
 -- main.lua requires this once; nothing in core knows about Valor Mortis.
 
-require("games.valormortis.app")
+require("game.app")
 
 local Unreal = require("core.unreal")
 local Runner = require("core.runner")
 local BugReport = require("core.bug_report")
 local Menu = require("core.ui.menu")
 local Gas = require("gas.gas")
-local Game = require("games.valormortis.game")
-local Shared = require("games.valormortis.shared")
-local Sheet = require("games.valormortis.sheet")
-local Health = require("games.valormortis.features.health")
-local Defense = require("games.valormortis.features.defense")
-local Damage = require("games.valormortis.features.damage")
-local Resources = require("games.valormortis.features.resources")
-local Movement = require("games.valormortis.features.movement")
-local Combat = require("games.valormortis.features.combat")
-local Buffs = require("games.valormortis.features.buffs")
-local Give = require("games.valormortis.features.give")
-local DevActions = require("games.valormortis.features.dev_actions")
-local SavedValues = require("games.valormortis.features.saved_values")
+local Game = require("game.game")
+local Shared = require("game.shared")
+local Sheet = require("game.sheet")
+local Health = require("game.features.health")
+local Defense = require("game.features.defense")
+local Damage = require("game.features.damage")
+local Resources = require("game.features.resources")
+local Movement = require("game.features.movement")
+local Combat = require("game.features.combat")
+local Buffs = require("game.features.buffs")
+local Give = require("game.features.give")
+local DevActions = require("game.features.dev_actions")
+local SavedValues = require("game.features.saved_values")
 
 Gas.Configure({ abilitySystem = Game.AbilitySystem })
 

@@ -1,11 +1,11 @@
--- games/valormortis/features/saved_values.lua
+-- game/features/saved_values.lua
 -- Checked once after every load: attribute values the game saved while a cheat was on.
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
 local Override = require("core.override")
 local Ledger = require("core.ledger")
-local Game = require("games.valormortis.game")
+local Game = require("game.game")
 local App = require("core.app")
 local Gas = require("gas.gas")
 

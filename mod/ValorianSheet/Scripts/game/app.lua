@@ -1,4 +1,4 @@
--- games/valormortis/app.lua
+-- game/app.lua
 -- ValorianSheet for Valor Mortis: the mod's identity and every setting with its vanilla value.
 
 local App = require("core.app")

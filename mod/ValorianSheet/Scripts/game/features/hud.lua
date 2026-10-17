@@ -1,4 +1,4 @@
--- games/valormortis/features/hud.lua
+-- game/features/hud.lua
 -- The player's HUD: telling it about values written directly (health, ammo, buff counters), and
 -- keeping the health bar at its normal length while Max Health is raised.
 --
@@ -8,7 +8,7 @@
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
-local Game = require("games.valormortis.game")
+local Game = require("game.game")
 local App = require("core.app")
 local Gas = require("gas.gas")
 local Ledger = require("core.ledger")

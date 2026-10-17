@@ -1,13 +1,13 @@
--- games/valormortis/features/resources.lua
+-- game/features/resources.lua
 -- Infinite Ammo, Healing Flasks and Consumables, No Item Cooldowns, Keep Catalysts On Death and
 -- Refill Everything.
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
-local Game = require("games.valormortis.game")
+local Game = require("game.game")
 local App = require("core.app")
-local Health = require("games.valormortis.features.health")
-local Hud = require("games.valormortis.features.hud")
+local Health = require("game.features.health")
+local Hud = require("game.features.hud")
 local Gas = require("gas.gas")
 
 local Resources = {}

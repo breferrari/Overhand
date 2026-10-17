@@ -5,7 +5,7 @@ ValorianSheet is a UE4SS Lua mod. UE4SS loads `Scripts/main.lua`; everything els
 The code is in three layers, and dependencies only point down:
 
 ```
-games/valormortis/   Valor Mortis: app definition, game access, features, menu content
+game/   Valor Mortis: app definition, game access, features, menu content
         │
         ▼
 gas/                 Gameplay Ability System helpers (any GAS game)
@@ -14,11 +14,11 @@ gas/                 Gameplay Ability System helpers (any GAS game)
 core/                Unreal + UE4SS + the menu framework (any UE4SS game)
 ```
 
-`core/` never requires `gas/` or `games/`, and `gas/` never requires `games/`. The smoke test enforces this. Whatever core needs from a game (the player, the controller, the game's menu widgets, button icons) is passed in by the game at startup. That is what makes the menu portable: see [PORTING.md](PORTING.md).
+`core/` never requires `gas/` or `game/`, and `gas/` never requires `game/`. The smoke test enforces this. Whatever core needs from a game (the player, the controller, the game's menu widgets, button icons) is passed in by the game at startup. That is what makes the menu portable: a new game is a copy of this repo with a new `game/` (see [PORTING.md](PORTING.md)).
 
 ## Startup
 
-`main.lua` picks the game (`GAME = "valormortis"`) and requires `games/<game>/init.lua`, which:
+`main.lua` requires `game/init.lua`, which:
 
 1. defines the app (`App.Define`: name, version, menu title, every setting with its vanilla value),
 2. passes core what it needs (`Gas.Configure`, `Menu.Configure`, `Runner.Configure`),
@@ -50,7 +50,7 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 
 `gas.lua`: attribute reads and writes (`GetAttribute`, `SetBaseValueKeepModifiers`, `FillAttribute`, ...), the override accessors `BASE_VALUE` (saved, ledgered) and `CURRENT_VALUE` (live only), gameplay tags, applying effects, and a per-tick snapshot of the player's active effects. Needs only the player's AbilitySystemComponent, passed in with `Gas.Configure`.
 
-## games/valormortis/
+## game/
 
 | Module | Responsibility |
 |---|---|
@@ -86,7 +86,7 @@ Then `main.lua` starts the log, loads the settings, binds the keys and starts on
 
 ## Adding a cheat
 
-1. Add the setting with its vanilla value in `games/valormortis/app.lua`.
+1. Add the setting with its vanilla value in `game/app.lua`.
 2. Implement it in the matching `features/` module: apply it in a tick function; register anything per-world that is not a cached lookup with `Unreal.OnWorldReset`. A new module is registered in `init.lua` with `Runner.AddFeature`.
 3. Add a row in `sheet.lua` (`Menu.Toggle`, `Menu.Choice` or `Menu.Action`).
 4. Run `python tools/smoke_test.py`, then try it in the game.

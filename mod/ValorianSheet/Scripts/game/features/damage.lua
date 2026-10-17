@@ -1,4 +1,4 @@
--- games/valormortis/features/damage.lua
+-- game/features/damage.lua
 -- Scaling damage before it lands. The game deals damage through MTCombatUtils functions; we hook
 -- them and scale the damage values:
 --   incoming (target is William): God Mode blocks it (Damage Taken works on resistances instead,
@@ -9,7 +9,7 @@
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
-local Game = require("games.valormortis.game")
+local Game = require("game.game")
 local App = require("core.app")
 
 local Damage = {}

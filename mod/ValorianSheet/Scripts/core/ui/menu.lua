@@ -6,7 +6,7 @@
 --   Controller (core/ui/input.lua): L3 + R3 open / close, D-pad, A use, B close, LB / RB tabs
 --
 -- Knows no game: the game passes in what it needs with Menu.Configure and defines the content with
--- Menu.AddTab (see games/<game>/sheet.lua). Everything runs on the game thread from Menu.Tick; while
+-- Menu.AddTab (see game/sheet.lua). Everything runs on the game thread from Menu.Tick; while
 -- the menu is closed a tick only looks at the key queue and one controller button. A refresh only
 -- touches widgets whose text or colour changed.
 

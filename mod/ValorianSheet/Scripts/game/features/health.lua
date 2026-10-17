@@ -1,16 +1,16 @@
--- games/valormortis/features/health.lua
+-- game/features/health.lua
 -- Survival: God Mode, Infinite Stamina / Nephtoglobin, Fall Damage, Max Health and Health
 -- Regeneration. (Damage Taken is features/defense.lua.)
 
 local Unreal = require("core.unreal")
 local Log = require("core.log")
 local Override = require("core.override")
-local Game = require("games.valormortis.game")
+local Game = require("game.game")
 local App = require("core.app")
-local Hud = require("games.valormortis.features.hud")
-local Combat = require("games.valormortis.features.combat")
+local Hud = require("game.features.hud")
+local Combat = require("game.features.combat")
 local Gas = require("gas.gas")
-local Shared = require("games.valormortis.shared")
+local Shared = require("game.shared")
 
 local Health = {}
 
