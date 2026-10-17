@@ -1,0 +1,7 @@
+# Written by the mod at runtime
+mod/ValorianSheet/*.log
+mod/ValorianSheet/*.log.old
+mod/ValorianSheet/settings.cfg
+mod/ValorianSheet/teleports.txt
+mod/ValorianSheet/ValorianSheet-BugReport.txt
+__pycache__/
