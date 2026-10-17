@@ -10,6 +10,7 @@ local State = require("state")
 local Settings = require("settings")
 local Health = require("features.health")
 local Defense = require("features.defense")
+local Damage = require("features.damage")
 local Movement = require("features.movement")
 local Combat = require("features.combat")
 local Resources = require("features.resources")
@@ -20,14 +21,13 @@ local SavedValues = require("features.saved_values")
 
 local Cheats = {}
 
-local SETTLE_SECONDS = 2               -- after William appears, before anything is applied
-local SAVED_VALUES_TIMEOUT = 10        -- the cheats stop waiting for the saved-values check after this
-local SAVED_VALUES_RETRY = 0.5
+local SETTLE_SECONDS = 2   -- after William appears, before anything is applied
 
 local FEATURES = {
     { name = "dev actions", tick = DevActions.Tick },
     { name = "health", tick = Health.Tick },
     { name = "damage taken", tick = Defense.Tick },
+    { name = "damage hooks", tick = Damage.Tick },
     { name = "resources", tick = Resources.Tick },
     { name = "movement", tick = Movement.Tick },
     { name = "combat", tick = Combat.Tick },
@@ -37,9 +37,7 @@ local FEATURES = {
 local session = {
     readyAt = 0,                  -- nothing is applied before then (the world is still loading)
     playerAddress = nil,          -- the William the per-world state belongs to
-    savedValuesChecked = false,
-    savedValuesDeadline = 0,
-    nextSavedValuesTryAt = 0,
+    savedValuesChecked = false,   -- retried every tick until the attribute sets were readable
     brokenWeaponsChecked = false,
 }
 
@@ -47,21 +45,6 @@ Unreal.OnWorldReset(function()
     session.savedValuesChecked = false
     session.brokenWeaponsChecked = false
 end)
-
--- The saved-values check must run before any feature touches attributes; it is retried until the
--- attribute sets are readable. Returns true once the features may run.
-local function checkSavedValues()
-    if session.savedValuesChecked then return true end
-    if os.clock() < session.nextSavedValuesTryAt then return false end
-    session.nextSavedValuesTryAt = os.clock() + SAVED_VALUES_RETRY
-    local ok, allChecked = Log.Guarded("check saved values", SavedValues.Check)
-    local done = ok and allChecked == true
-    if done or os.clock() >= session.savedValuesDeadline then
-        if not done then Log.Info("saved values: attribute sets not readable, continuing without the check") end
-        session.savedValuesChecked = true
-    end
-    return session.savedValuesChecked
-end
 
 function Cheats.Tick()
     if os.clock() < session.readyAt then return end
@@ -78,12 +61,14 @@ function Cheats.Tick()
         Unreal.ResetWorld()
         session.playerAddress = address
         session.readyAt = os.clock() + SETTLE_SECONDS
-        session.savedValuesDeadline = session.readyAt + SAVED_VALUES_TIMEOUT
         State.status = "Ready"
         return
     end
 
-    if not checkSavedValues() then return end
+    if not session.savedValuesChecked then
+        local ok, allChecked = Log.Guarded("check saved values", SavedValues.Check)
+        session.savedValuesChecked = ok and allChecked == true
+    end
     if not session.brokenWeaponsChecked then
         session.brokenWeaponsChecked = Unreal.Try(Give.RemoveBrokenWeapons) == true
     end

@@ -20,7 +20,7 @@ main.lua ──► settings.lua ─────────────┐
 | `lib/unreal.lua` | Safe calls into Unreal objects (`Try`, `IsValid`, ...) and **cached lookups** (`FindCached`). The only place that is allowed to search the object list on a schedule. |
 | `lib/log.lua` | Session log (console + `ValorianSheet.log`), `Debug` lines, `Guarded` (run and log errors with a traceback). |
 | `lib/paths.lua` | The mod folder; everything the mod writes stays in it. |
-| `lib/override.lua` | Change a game value and put the vanilla value back later, even when the game changes it in between; keeps the **attribute ledger** for values that end up in the save file. |
+| `lib/override.lua` | Change a game value and put the vanilla value back later, even when the game changes it in between: properties and attribute CurrentValues (never saved), and attribute BaseValues (saved, so kept in the **attribute ledger**). |
 | `game.lua` | Access to Valor Mortis: controller, player, components, attribute sets, subsystems, items, effects, the developers' cheat manager. |
 | `state.lua` | `State.settings` (what the player chose), status line, teleports, ledger, and the few runtime flags that more than one feature reads. |
 | `features/*.lua` | One module per feature group. Each exposes `Tick()` plus the actions the menu calls, and registers its per-world state with `Unreal.OnWorldReset`. |

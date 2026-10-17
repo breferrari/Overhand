@@ -2,7 +2,7 @@
 -- A keyboard menu drawn with plain UMG widgets: tabs of rows (toggles, choices, actions), an
 -- optional slider on long choices for the mouse, and a status line.
 --
---   F6 / Esc       open / close          Up / Down      select a row
+--   F5 / Esc       open / close          Up / Down      select a row
 --   Left / Right   change the value      Enter          toggle / run (twice for risky actions)
 --   Q / E          previous / next tab
 --
@@ -25,7 +25,7 @@ local COLORS = Widgets.COLORS
 local try, isValid = Unreal.Try, Unreal.IsValid
 
 local TITLE = "VALORIAN SHEET"
-local HINT = "Up/Down select   Left/Right change   Enter use   Q/E tab   F6 close"
+local HINT = "Up/Down select   Left/Right change   Enter use   Q/E tab   F5 close"
 local MIN_WIDTH = 460
 local SLIDER_WIDTH = 150
 local VALUE_WIDTH = 120
@@ -486,7 +486,7 @@ local function handleCommand(command)
 end
 
 function Menu.BindKeys()
-    Input.Bind(Key.F6, "toggle")
+    Input.Bind(Key.F5, "toggle")
     Input.Bind(Key.ESCAPE, "close")
     Input.Bind(Key.UP_ARROW, "up")
     Input.Bind(Key.DOWN_ARROW, "down")

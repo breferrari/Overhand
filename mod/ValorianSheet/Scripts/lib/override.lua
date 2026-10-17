@@ -20,9 +20,17 @@ local Settings = require("settings")
 local Override = {}
 Override.__index = Override
 
--- Module-level callees: these run every tick for every active override, so no closure per call.
+-- How a value is read and written. Module-level: these run every tick for every active override.
 local function readProperty(object, propertyName) return object[propertyName] end
 local function writeProperty(object, propertyName, value) object[propertyName] = value end
+
+local PROPERTY = {
+    read = function(object, name) return Unreal.TryNumber(readProperty, object, name) end,
+    write = function(object, name, value) pcall(writeProperty, object, name, value) end,
+}
+-- An attribute's CurrentValue: rebuilt by the game from BaseValue (on load, on recalculation), so
+-- like a property it is never saved and needs no ledger.
+local CURRENT_VALUE = { read = Game.GetAttribute, write = Game.SetCurrentValue }
 
 -- entries: object address -> property/attribute name -> entry
 function Override.new() return setmetatable({ entries = {} }, Override) end
@@ -59,23 +67,33 @@ local function compute(factorOrFunction, base)
     return base * factorOrFunction
 end
 
--- A plain number property (CharacterMovement.MaxWalkSpeed, ...).
-function Override:property(object, propertyName, factorOrFunction)
-    local current = Unreal.TryNumber(readProperty, object, propertyName)
+-- A value that is not saved, through an accessor pair (see PROPERTY / CURRENT_VALUE).
+local function overrideUnsaved(override, accessor, object, name, factorOrFunction)
+    local current = accessor.read(object, name)
     if not current then return end
-    local entry, byName = entryFor(self, object, propertyName)
+    local entry, byName = entryFor(override, object, name)
     if not byName then return end
     if not entry then
-        entry = { object = object, propertyName = propertyName, base = current }
-        byName[propertyName] = entry
-        Log.Debug(propertyName .. ": vanilla " .. tostring(current))
-    elseif entry.written and math.abs(current - entry.written) > 0.001 then
-        Log.Debug(propertyName .. ": game set " .. tostring(current) .. ", new base")
+        entry = { object = object, name = name, accessor = accessor, base = current }
+        byName[name] = entry
+        Log.Debug(name .. ": vanilla " .. tostring(current))
+    elseif entry.written and not Override.NearlyEqual(current, entry.written) then
+        Log.Debug(name .. ": game set " .. tostring(current) .. ", new base")
         entry.base = current
     end
     local wanted = compute(factorOrFunction, entry.base)
-    if math.abs(current - wanted) > 0.001 then pcall(writeProperty, object, propertyName, wanted) end
+    if not Override.NearlyEqual(current, wanted) then accessor.write(object, name, wanted) end
     entry.written = wanted
+end
+
+-- A plain number property (CharacterMovement.MaxWalkSpeed, ...).
+function Override:property(object, propertyName, factorOrFunction)
+    overrideUnsaved(self, PROPERTY, object, propertyName, factorOrFunction)
+end
+
+-- An attribute's CurrentValue (e.g. the resistances): changed live only, never saved.
+function Override:currentValue(set, attributeName, factorOrFunction)
+    overrideUnsaved(self, CURRENT_VALUE, set, attributeName, factorOrFunction)
 end
 
 -- A gameplay attribute (FGameplayAttributeData).
@@ -108,19 +126,19 @@ function Override:attribute(set, attributeName, factorOrFunction)
     entry.written = wanted
 end
 
--- A property still holding our value gets its base back.
-local function restoreProperty(entry)
+-- An unsaved value still holding ours gets its base back.
+local function restoreUnsaved(entry)
     if not Unreal.IsValid(entry.object) then return end
-    local current = Unreal.TryNumber(readProperty, entry.object, entry.propertyName)
-    if current and entry.written and math.abs(current - entry.written) < 0.001 then
-        pcall(writeProperty, entry.object, entry.propertyName, entry.base)
+    local current = entry.accessor.read(entry.object, entry.name)
+    if current and entry.written and Override.NearlyEqual(current, entry.written) then
+        entry.accessor.write(entry.object, entry.name, entry.base)
     end
 end
 
 function Override:restore()
     forEachEntry(self, function(entry)
-        if entry.propertyName then
-            restoreProperty(entry)
+        if entry.accessor then
+            restoreUnsaved(entry)
         else
             if Unreal.IsValid(entry.set) then
                 Game.SetBaseValueKeepModifiers(entry.set, entry.attributeName, entry.base)
@@ -133,11 +151,11 @@ function Override:restore()
 end
 
 -- World reset: objects that survive it (the same William after a restart) get their vanilla
--- properties back, so the next apply starts from the real base instead of our own value.
--- Attributes keep our value: the ledger recognises it on the next apply.
+-- unsaved values back, so the next apply starts from the real base instead of our own value.
+-- Saved attributes keep our value: the ledger recognises it on the next apply.
 function Override:release()
     forEachEntry(self, function(entry)
-        if entry.propertyName then restoreProperty(entry) end
+        if entry.accessor then restoreUnsaved(entry) end
     end)
     self.entries = {}
 end

@@ -15,9 +15,7 @@ local Hud = {}
 local try, isValid = Unreal.Try, Unreal.IsValid
 
 local DEFAULT_PIXELS_PER_HEALTH = 2.5   -- 250 px for 100 max health in 1.0
-local OWNER_CHECK_INTERVAL = 1
 
-local nextOwnerCheckAt = 0
 local healthBar = {}
 
 local function resetHealthBar()
@@ -33,30 +31,19 @@ end
 resetHealthBar()
 Unreal.OnWorldReset(resetHealthBar)
 
--- true / false, or nil when the widget's owner is unknown.
-local function ownedByPlayer(widget)
-    local pawn = try(function() return widget:GetOwningPlayerPawn() end)
-    if not isValid(pawn) then return nil end
-    return Game.IsPlayer(pawn)
+local function owningPawn(widget) return widget:GetOwningPlayerPawn() end
+
+-- William's own HUD ranks highest; one whose owner is unknown is a fallback (the old HUD after a
+-- load also loses its owner); one owned by an old William is rejected.
+local OWNED, OWNER_UNKNOWN = 2, 1
+local function rankVitals(widget)
+    local pawn = try(owningPawn, widget)
+    if not isValid(pawn) then return OWNER_UNKNOWN end
+    return Game.IsPlayer(pawn) and OWNED or nil
 end
 
-local VITALS_CLASS = "WBP_PlayerVitals_C"
-local function isOwnedByPlayer(widget) return ownedByPlayer(widget) == true end
-local function hasUnknownOwner(widget) return ownedByPlayer(widget) == nil end
-
--- The HUD widget that belongs to the current William. One whose owner is unknown is only a
--- fallback while none is known to be his (the old HUD after a load also has no owner any more).
 local function vitalsWidget()
-    local owned = Unreal.FindCached("vitals", VITALS_CLASS, 2, isOwnedByPlayer)
-    if owned and os.clock() >= nextOwnerCheckAt then
-        nextOwnerCheckAt = os.clock() + OWNER_CHECK_INTERVAL
-        if not isOwnedByPlayer(owned) then
-            Log.Debug("health bar: HUD no longer belongs to William, looking for his")
-            Unreal.Forget("vitals")
-            owned = nil
-        end
-    end
-    return owned or Unreal.FindCached("vitalsOwnerUnknown", VITALS_CLASS, 2, hasUnknownOwner)
+    return Unreal.FindRanked("vitals", "WBP_PlayerVitals_C", 2, rankVitals, OWNED)
 end
 
 local function healthBarWidget()
@@ -129,10 +116,7 @@ function Hud.KeepHealthBarLength()
         if not freshWidget then logLayout("game changed the bar", width) end
         healthBar.widthWeSet = nil
         local pixelsPerHealth = width / maxHealth
-        local plausible = pixelsPerHealth > 0.05 and pixelsPerHealth < 50
-        if plausible and (factor == 1 or State.appliedMaxHealthFactor == factor) then
-            healthBar.pixelsPerHealth = pixelsPerHealth
-        end
+        if pixelsPerHealth > 0.05 and pixelsPerHealth < 50 then healthBar.pixelsPerHealth = pixelsPerHealth end
     end
 
     local function setWidth(newWidth, reason)
@@ -155,8 +139,10 @@ function Hud.KeepHealthBarLength()
         return
     end
     healthBar.wasResized = true
-    if State.appliedMaxHealthFactor ~= factor then return end -- Max Health not applied yet this tick
-    local vanillaMaxHealth = maxHealth - baseMaxHealth + baseMaxHealth / factor -- buffs kept
+    -- the vanilla base from the ledger, once our value is in place (buffs on top are kept)
+    local recorded = State.attributeLedger.MaxHealth
+    if not recorded or math.abs(baseMaxHealth - recorded.written) > 0.01 then return end
+    local vanillaMaxHealth = maxHealth - baseMaxHealth + recorded.vanilla
     setWidth(pixelsPerHealth * vanillaMaxHealth,
         string.format("Max Health x%s, vanilla max health %.0f", tostring(factor), vanillaMaxHealth))
 end

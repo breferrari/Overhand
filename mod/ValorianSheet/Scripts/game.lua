@@ -111,6 +111,11 @@ function Game.SetAttribute(set, attributeName, value)
     end)
 end
 
+local function writeCurrentValue(set, attributeName, value) set[attributeName].CurrentValue = value end
+
+-- CurrentValue only: the game rebuilds it from BaseValue, so this is never saved.
+function Game.SetCurrentValue(set, attributeName, value) pcall(writeCurrentValue, set, attributeName, value) end
+
 -- Sets BaseValue and moves CurrentValue by the same amount, so active buffs are kept.
 function Game.SetBaseValueKeepModifiers(set, attributeName, value)
     try(function()

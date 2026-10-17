@@ -19,18 +19,15 @@ local try, isValid = Unreal.Try, Unreal.IsValid
 
 local combatState = { checkedAt = -math.huge, inCombat = false }
 
-local searchWorldAddress = nil   -- the world being matched by the search below
-
-local function belongsToSearchWorld(subsystem)
-    local outer = try(function() return subsystem:GetOuter() end)
-    return searchWorldAddress ~= nil and Unreal.AddressOf(outer) == searchWorldAddress
-end
-
 local function enemyInfoOfThisWorld()
     local cached = Unreal.GetCached("enemyInfo")
     if cached then return cached end
-    searchWorldAddress = Unreal.AddressOf(Game.World())
-    return Unreal.FindCached("enemyInfo", "EnemyInfoSubsystem", 5, belongsToSearchWorld)
+    -- a miss: search (at most every 5 s) for the subsystem whose outer is William's world
+    local worldAddress = Unreal.AddressOf(Game.World())
+    return Unreal.FindCached("enemyInfo", "EnemyInfoSubsystem", 5, function(subsystem)
+        local outer = try(function() return subsystem:GetOuter() end)
+        return worldAddress ~= nil and Unreal.AddressOf(outer) == worldAddress
+    end)
 end
 
 function Combat.IsInCombat()

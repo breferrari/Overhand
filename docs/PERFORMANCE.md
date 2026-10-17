@@ -31,8 +31,8 @@ Everything kept is per world and dropped by the single world reset when a new Wi
 
 | Path | Now |
 |---|---|
-| Game menus | Searched only when you press F6, at most once a minute per class that has no widget yet. While our menu is open only the kept widgets are checked, twice a second. The game gets no input while it's open, so its menus can't open by accident. |
-| Health bar | The HUD widget is a cached lookup (owner re-checked once a second); the bar is its child. **0 searches.** |
+| Game menus | Searched only when you press F5, at most once a minute per class that has no widget yet. While our menu is open only the kept widgets are checked, twice a second. The game gets no input while it's open, so its menus can't open by accident. |
+| Health bar | The HUD widget is a ranked cached lookup (`Unreal.FindRanked`: William's own HUD first, unknown owner as fallback); the bar is its child. **0 searches** once his HUD is found. |
 | Combat check | The enemy-info subsystem of William's world is kept. **0 searches** after the first. |
 | Toggle Sprint | `FindAllCached`, retry 5 s. |
 | Controller, components, attribute sets, inventory, save subsystem | `FindCached` / kept: 1–5 s between searches after a miss; in the main menu that's **1 search/s** instead of 30. |
@@ -50,14 +50,14 @@ Everything kept is per world and dropped by the single world reset when a new Wi
 | Infinite Buffs | 0.1 s while on, 0.5 s while off |
 | No Item Cooldowns | 0.25 s |
 | Health Regeneration | a step every 0.25 s while healing |
-| Damage Taken | 4 resistance reads per tick while below 100 % |
+| Damage Taken | resistances re-applied when the active effects change, at most every 0.25 s otherwise |
 | Health bar length | 0.2 s while Max Health is raised |
 
 ## The menu
 
 - **Closed:** each tick reads the key queue and returns.
 - **Open:** the visible tab is redrawn 4 times a second and after every key press, but only widgets whose text or colour changed are touched (usually none, or the two rows the selection moved between). Long lists (Give Item, teleport slots) are rebuilt only when their source changes. No searches.
-- **First open:** builds all widgets once (a few hundred `StaticConstructObject` calls). Expect one short hitch the first time you press F6 in a session.
+- **First open:** builds all widgets once (a few hundred `StaticConstructObject` calls). Expect one short hitch the first time you press F5 in a session.
 
 ## Checking it yourself
 

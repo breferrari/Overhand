@@ -31,11 +31,13 @@ local DAMAGE_MULTIPLIERS = {
     { set = "Ranged", className = "RangedAttributeSet", attribute = "RangedDamageMultiplier" },
 }
 
+-- Returns false while a damage attribute set is not readable yet.
 local function repairDamageMultipliers()
     local repaired = 0
     for _, multiplier in ipairs(DAMAGE_MULTIPLIERS) do
         local set = Game.AttributeSet(multiplier.set)
         local base = set and Game.GetBaseValue(set, multiplier.attribute)
+        if not base then return false end
         local default = defaultBaseValue(multiplier.className, multiplier.attribute)
         if base and base >= default * 1.4 then
             Game.SetBaseValueKeepModifiers(set, multiplier.attribute, default)
@@ -44,6 +46,7 @@ local function repairDamageMultipliers()
         end
     end
     if repaired > 0 then State.status = "Repaired your damage values (left over from an old cheat menu)" end
+    return true
 end
 
 -- Returns false while an attribute set in the ledger is not readable yet (try again later).
@@ -61,12 +64,7 @@ local function restoreLedgerValues()
             if not Override.NearlyEqual(base, recorded.written) then
                 Log.Debug(attributeName .. ": saved value " .. base .. " is not ours, ledger entry dropped")
                 Override.RecordInLedger(attributeName, nil)
-            elseif known.cheatOn() then
-                -- still on: the override picks up the real vanilla value from the ledger
-                if attributeName == "MaxHealth" and recorded.vanilla > 0 then
-                    State.appliedMaxHealthFactor = recorded.written / recorded.vanilla
-                end
-            else
+            elseif not known.cheatOn() then -- (still on: the override picks up the vanilla value itself)
                 Game.SetBaseValueKeepModifiers(set, attributeName, recorded.vanilla)
                 if attributeName == "MaxHealth" and recorded.written > 0 then
                     local health = Game.GetAttribute(set, "Health")
@@ -82,11 +80,14 @@ local function restoreLedgerValues()
     return allChecked
 end
 
--- Returns true once everything could be checked; until then the cheats wait (see cheats.lua), so
--- Max Health is never applied on top of a value saved last session.
+-- Returns true once everything could be checked (the caller retries until then); each part runs
+-- once per world.
+local repairDone = false
 function SavedValues.Check()
-    repairDamageMultipliers()
-    return restoreLedgerValues()
+    repairDone = repairDone or repairDamageMultipliers()
+    return restoreLedgerValues() and repairDone
 end
+
+Unreal.OnWorldReset(function() repairDone = false end)
 
 return SavedValues

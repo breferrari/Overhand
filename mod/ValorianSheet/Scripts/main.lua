@@ -28,4 +28,4 @@ ValorianSheetTick = function()
 end
 ValorianSheetTickHandle = LoopInGameThreadWithDelay(33, ValorianSheetTick)
 
-Log.Info("loaded, press F6 in game")
+Log.Info("loaded, press F5 in game")

@@ -44,7 +44,7 @@ local function formatValue(value)
 end
 
 local function settingsText()
-    local lines = { "# ValorianSheet settings. Changed from the in-game menu (F6)." }
+    local lines = { "# ValorianSheet settings. Changed from the in-game menu (F5)." }
     for _, key in ipairs(State.SortedSettingKeys()) do
         if not State.SESSION_ONLY[key] then lines[#lines + 1] = key .. "=" .. formatValue(State.settings[key]) end
     end

@@ -52,14 +52,14 @@ def run_mod(mod_folder: pathlib.Path, walk_menu: bool = True) -> list[str]:
 
     # Main menu: no player controller yet.
     tick(5)
-    press("F6")
+    press("F5")
     # A save is loaded; the clock jumps past the world's settle time.
     mock.worldReady = True
     tick(1)
     advance_clock(100)
     tick(5)
     # Open the menu and walk every row of every tab: change values, run actions (twice for confirms).
-    press("F6")
+    press("F5")
     for _ in range(TAB_COUNT if walk_menu else 0):
         for _ in range(ROWS_PER_TAB):
             for key in ("RIGHT_ARROW", "LEFT_ARROW", "RETURN", "RETURN", "DOWN_ARROW"):
@@ -78,7 +78,7 @@ def run_mod(mod_folder: pathlib.Path, walk_menu: bool = True) -> list[str]:
     undefined = sorted({str(mock.undefinedGlobals[i]) for i in range(1, len(mock.undefinedGlobals) + 1)})
     if undefined:
         problems.append("undefined globals read: " + ", ".join(undefined))
-    if "loaded, press F6" not in log:
+    if "loaded, press F5" not in log:
         printed = "\n".join(str(mock.printed[i]) for i in range(1, len(mock.printed) + 1))
         problems.append("mod did not finish loading:\n" + printed)
     return problems

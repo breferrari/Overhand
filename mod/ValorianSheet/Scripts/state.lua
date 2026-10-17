@@ -71,6 +71,5 @@ State.teleports = {}
 -- Runtime flags read by more than one feature.
 State.noClipActive = false
 State.safeLandingUntil = 0          -- no fall damage until then (after NoClip / teleport)
-State.appliedMaxHealthFactor = 1    -- the Max Health factor currently applied
 
 return State

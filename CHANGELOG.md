@@ -13,6 +13,13 @@
   - shared helpers for the item database, tag names, HUD refreshes, rate-limited log lines, file I/O, `Game.IsPlayer`, `Game.PlayerHealth`, combat-utils hooks
 - **Efficiency:** one shared read of the active effects per tick, Dodge Window reads it only when it changes, the menu only redraws what changed, memoized dynamic lists, early returns for cheats that are off, no closures in the hottest helpers.
 - **Removed:** importing settings from the Valor Mortis Cheat Menu and Passive Health Regen (set them once in the menu).
+- **Second cleanup** (`/simplify`):
+  - Damage Taken is an `Override` (`Override:currentValue`, a read/write pair per entry) instead of its own tracking; re-applied when the active effects change or every 0.25 s.
+  - Max Health scales current health by the actual change in max health, so the saved-values gate, its timeout and `appliedMaxHealthFactor` are gone; the check retries without holding other features back, and the damage repair runs once per world.
+  - One heal helper (`addHealth` with a verified, sticky path) for God Mode and regeneration.
+  - `Unreal.FindRanked` replaces the HUD's two lookups (one search, William's own HUD preferred).
+  - The damage hooks are their own feature entry.
+- **Menu key** is F5.
 - **Fixes along the way:** every saved teleport slot is kept on save; settings write whole numbers without ".0".
 - **Code review fixes:**
   - A world reset hands back vanilla values on objects that survive it (Override:release), so Movement Speed etc. can no longer compound after a restart.

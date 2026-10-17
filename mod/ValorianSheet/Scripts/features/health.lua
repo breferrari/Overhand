@@ -9,7 +9,6 @@ local Game = require("game")
 local State = require("state")
 local Hud = require("features.hud")
 local Combat = require("features.combat")
-local Damage = require("features.damage")
 
 local Health = {}
 
@@ -17,38 +16,49 @@ local try, isValid = Unreal.Try, Unreal.IsValid
 
 -- ---------------------------------------------------------------------------
 -- Healing
--- Heals through the game's own heal (MTCombatUtils:Overheal, a GameplayEffect, so the health bar
--- animates as usual). If that does not raise his health, the value is written directly and the
--- health bar is told.
+-- A heal path asks the game to heal (so its HUD and effects follow). The first heal checks that
+-- health really rose; if it did not, that path writes health directly from then on and tells the
+-- health bar. Each path decides once and logs its choice once.
 -- ---------------------------------------------------------------------------
 
-local healMethod = nil -- "game" / "direct", logged once
-
-local function healTo(healthSet, health, maxHealth, targetHealth)
-    targetHealth = math.min(targetHealth, maxHealth)
-    if targetHealth <= health + 0.01 then return end
-    local combatUtils, player = Game.CombatUtils(), Game.Player()
-    if healMethod ~= "direct" and isValid(combatUtils) and player then
-        try(function() combatUtils:Overheal(targetHealth - health, player) end)
+-- path: { label, apply = function(healthSet, amount) -> true when the call went through, method }
+local function addHealth(path, healthSet, health, maxHealth, amount)
+    if amount <= 0.01 then return end
+    if path.method ~= "direct" and path.apply(healthSet, amount) then
+        if path.method == "game" then return end
         local healthAfter = Game.GetAttribute(healthSet, "Health")
-        if healthAfter and healthAfter >= targetHealth - 0.5 then
-            if healthAfter > maxHealth then Game.SetAttribute(healthSet, "Health", maxHealth) end -- no overheal from us
-            if healMethod ~= "game" then
-                healMethod = "game"
-                Log.Info("healing through the game's heal effect")
-            end
+        if healthAfter and healthAfter >= health + amount * 0.5 then
+            path.method = "game"
+            Log.Info(path.label .. ": healing through the game")
             return
         end
-        if healMethod == nil then Log.Info("game heal did not apply, writing health directly") end
-        healMethod = "direct"
     end
-    Game.SetAttribute(healthSet, "Health", targetHealth)
-    Hud.UpdateHealthBar(targetHealth, maxHealth)
+    if path.method ~= "direct" then
+        path.method = "direct"
+        Log.Info(path.label .. ": the game's heal did not apply, writing health directly")
+    end
+    local newHealth = math.min(maxHealth, health + amount)
+    Game.SetAttribute(healthSet, "Health", newHealth)
+    Hud.UpdateHealthBar(newHealth, maxHealth)
 end
+
+-- God Mode / Refill: MTCombatUtils:Overheal (a GameplayEffect, the bar animates as usual).
+local overhealPath = {
+    label = "full heal",
+    apply = function(healthSet, amount)
+        local combatUtils, player = Game.CombatUtils(), Game.Player()
+        if not isValid(combatUtils) or not player then return false end
+        local ok = try(function() combatUtils:Overheal(amount, player) return true end) == true
+        -- Overheal may go above max; we never leave William overhealed
+        local health, maxHealth = Game.GetAttribute(healthSet, "Health"), Game.GetAttribute(healthSet, "MaxHealth")
+        if health and maxHealth and health > maxHealth then Game.SetAttribute(healthSet, "Health", maxHealth) end
+        return ok
+    end,
+}
 
 function Health.FillHealth()
     local healthSet, health, maxHealth = Game.PlayerHealth()
-    if healthSet then healTo(healthSet, health, maxHealth, maxHealth) end
+    if healthSet then addHealth(overhealPath, healthSet, health, maxHealth, maxHealth - health) end
 end
 
 function Health.FillStamina()
@@ -106,29 +116,29 @@ local function applyFallDamageCurve()
 end
 
 -- ---------------------------------------------------------------------------
--- Max Health: MaxHealth times the factor; current health is scaled with it so the bar keeps its fill.
+-- Max Health: MaxHealth times the factor (a saved attribute, so through the ledger). Current health
+-- moves with every change of max health so the bar keeps its fill; a save that already holds our
+-- value (the ledger knows it) changes nothing and gets no free heal.
 -- ---------------------------------------------------------------------------
 
 local maxHealthOverride = Override.new()
 
 local function applyMaxHealth()
     local factor = State.settings.maxHealthFactor or 1
-    if factor == 1 and State.appliedMaxHealthFactor == 1 and not maxHealthOverride:isActive() then return end
-    local healthSet = Game.AttributeSet("Health")
+    if factor == 1 and not maxHealthOverride:isActive() then return end
+    local healthSet, health, maxHealthBefore = Game.PlayerHealth()
     if not healthSet then return end
     if factor ~= 1 then
         maxHealthOverride:attribute(healthSet, "MaxHealth", factor)
-    elseif maxHealthOverride:isActive() then
+    else
         maxHealthOverride:restore()
     end
-    if factor == State.appliedMaxHealthFactor then return end
-    local _, health, maxHealth = Game.PlayerHealth()
-    if health and health > 0 then
-        local scaledHealth = math.min(health * factor / State.appliedMaxHealthFactor, maxHealth)
+    local maxHealthAfter = Game.GetAttribute(healthSet, "MaxHealth")
+    if maxHealthAfter and health > 0 and not Override.NearlyEqual(maxHealthAfter, maxHealthBefore) then
+        local scaledHealth = math.min(health * maxHealthAfter / maxHealthBefore, maxHealthAfter)
         Game.SetAttribute(healthSet, "Health", scaledHealth)
-        Log.Debug("max health x" .. factor .. ": MaxHealth=" .. maxHealth .. ", Health " .. health .. " -> " .. scaledHealth)
+        Log.Debug(string.format("max health %.0f -> %.0f, health %.0f -> %.0f", maxHealthBefore, maxHealthAfter, health, scaledHealth))
     end
-    State.appliedMaxHealthFactor = factor
 end
 
 -- ---------------------------------------------------------------------------
@@ -136,18 +146,13 @@ end
 -- starting a while after the last hit, up to a share of max health, optionally only out of combat.
 -- Applied four times a second through GASCompanion's SetAttributeValue on the Health attribute the
 -- game's own GE_AddHealth effect modifies, so the game and its HUD see a normal attribute change.
--- If that path is not available, health is written directly and the health bar is told.
 -- ---------------------------------------------------------------------------
 
 local REGEN_STEP_SECONDS = 0.25
 local ADD_HEALTH_EFFECT = "/Game/Minotaur/Gameplay/GAS/GameplayEffects/GE_AddHealth.Default__GE_AddHealth_C"
 local COMPANION_LIBRARY = "/Script/GASCompanion.Default__GSCBlueprintFunctionLibrary"
 
-local regen = {
-    lastHealth = nil, lastHitAt = -math.huge, lastStepAt = nil,
-    healthAttribute = nil, nextAttributeSearchAt = 0,
-    method = nil,   -- "attributes" / "direct": decided by the first step that healed, logged once
-}
+local regen = { lastHealth = nil, lastHitAt = -math.huge, lastStepAt = nil, healthAttribute = nil, nextAttributeSearchAt = 0 }
 
 -- The FGameplayAttribute for Health, taken from GE_AddHealth's modifiers (looked up every 5 s until found).
 local function healthAttribute()
@@ -166,22 +171,25 @@ local function healthAttribute()
     return regen.healthAttribute
 end
 
-local function addHealthThroughAttributeSystem(healthSet, amount)
-    local library, player, attribute = Unreal.Static(COMPANION_LIBRARY), Game.Player(), healthAttribute()
-    local core = isValid(library) and player and try(function() return library:GetCompanionCoreComponent(player) end)
-    if not isValid(core) or not attribute then return false end
-    local base = Game.GetBaseValue(healthSet, "Health")
-    return base ~= nil and try(function() core:SetAttributeValue(attribute, base + amount) return true end) == true
-end
+local function getCompanionCore(library, player) return library:GetCompanionCoreComponent(player) end
+local function setAttributeValue(core, attribute, value) core:SetAttributeValue(attribute, value) end
+
+local regenPath = {
+    label = "health regeneration",
+    apply = function(healthSet, amount)
+        local library, player, attribute = Unreal.Static(COMPANION_LIBRARY), Game.Player(), healthAttribute()
+        local core = isValid(library) and player and try(getCompanionCore, library, player)
+        local base = Game.GetBaseValue(healthSet, "Health")
+        if not isValid(core) or not attribute or not base then return false end
+        return pcall(setAttributeValue, core, attribute, base + amount)
+    end,
+}
 
 local function regenerateHealth()
     local settings = State.settings
     local perSecond = settings.regenPerSecond or 0
-    if perSecond <= 0 then
-        regen.lastHealth, regen.lastStepAt = nil, nil
-        return
-    end
-    local healthSet, health, maxHealth = Game.PlayerHealth()
+    local healthSet, health, maxHealth
+    if perSecond > 0 then healthSet, health, maxHealth = Game.PlayerHealth() end
     if not healthSet then
         regen.lastHealth, regen.lastStepAt = nil, nil
         return
@@ -206,26 +214,8 @@ local function regenerateHealth()
     if elapsed < REGEN_STEP_SECONDS then return end
     regen.lastStepAt = now
 
-    local amount = math.min(perSecond * math.min(elapsed, 1), missing)
-    if regen.method ~= "direct" and addHealthThroughAttributeSystem(healthSet, amount) then
-        local healthAfter = Game.GetAttribute(healthSet, "Health")
-        if healthAfter and healthAfter >= health + amount * 0.5 then
-            regen.lastHealth = healthAfter
-            if regen.method ~= "attributes" then
-                regen.method = "attributes"
-                Log.Info(string.format("health regeneration: %s health per second, through the attribute system", tostring(perSecond)))
-            end
-            return
-        end
-    end
-    -- the attribute path is missing or did not raise health: write it directly from now on
-    if regen.method ~= "direct" then
-        regen.method = "direct"
-        Log.Info(string.format("health regeneration: %s health per second, written directly", tostring(perSecond)))
-    end
-    Game.SetAttribute(healthSet, "Health", health + amount)
-    Hud.UpdateHealthBar(health + amount, maxHealth)
-    regen.lastHealth = Game.GetAttribute(healthSet, "Health") or health + amount
+    addHealth(regenPath, healthSet, health, maxHealth, math.min(perSecond * math.min(elapsed, 1), missing))
+    regen.lastHealth = Game.GetAttribute(healthSet, "Health")
 end
 
 -- ---------------------------------------------------------------------------
@@ -243,14 +233,12 @@ function Health.Tick()
     end
     Log.Guarded("fall damage", applyFallDamageCurve)
     Log.Guarded("health regeneration", regenerateHealth)
-    Log.Guarded("damage hooks", Damage.Tick)
     Log.Guarded("max health", applyMaxHealth)
     Log.Guarded("health bar length", Hud.KeepHealthBarLength) -- after Max Health was applied this tick
 end
 
 Unreal.OnWorldReset(function()
     maxHealthOverride:release()
-    State.appliedMaxHealthFactor = 1
     regen.lastHealth, regen.lastStepAt = nil, nil
     -- fallCurve is not reset: the curve is a game asset that outlives the world, and resetting would
     -- take our scaled values for the originals. A different curve is noticed by its address.

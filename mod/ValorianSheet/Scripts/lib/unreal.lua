@@ -120,6 +120,29 @@ function Unreal.FindAllCached(key, className, retrySeconds)
     return alive
 end
 
+-- The best live object of className by rank(object) (a number, higher is better; nil rejects it),
+-- kept under key. The kept object is ranked again on every call (rank should be cheap); while it is
+-- below bestRank, or once it is rejected, a new search runs at most every retrySeconds.
+function Unreal.FindRanked(key, className, retrySeconds, rank, bestRank)
+    local kept = cachedObjects[key]
+    local keptRank = kept and Unreal.IsValid(kept.object) and rank(kept.object)
+    if keptRank and keptRank >= bestRank then return kept.object end
+    if searchAllowed(key, retrySeconds) then
+        local bestObject, bestFound = nil, nil
+        for _, object in ipairs(Unreal.FindAllLive(className)) do
+            local objectRank = rank(object)
+            if objectRank and (not bestFound or objectRank > bestFound) then bestObject, bestFound = object, objectRank end
+        end
+        if bestObject and (not keptRank or bestFound > keptRank) then
+            cachedObjects[key] = { object = bestObject }
+            return bestObject
+        end
+    end
+    if keptRank then return kept.object end
+    cachedObjects[key] = nil
+    return nil
+end
+
 -- Static objects (class default objects, function libraries) never change: one lookup each.
 local staticObjects = {}
 function Unreal.Static(path)

@@ -2,7 +2,7 @@
 
 **An in-game cheat sheet for Valor Mortis.** One keyboard menu, every cheat, nothing running that you didn't switch on.
 
-Press **F6**, pick a tab, change a value. Every cheat can be switched off at any time and puts the game back to vanilla when you do. Your choices are saved for the next session.
+Press **F5**, pick a tab, change a value. Every cheat can be switched off at any time and puts the game back to vanilla when you do. Your choices are saved for the next session.
 
 ```
 VALORIAN SHEET
@@ -19,7 +19,7 @@ HEALTH REGENERATION
   Regeneration                     Off (vanilla)
 
 Ready
-Up/Down select   Left/Right change   Enter use   Q/E tab   F6 close
+Up/Down select   Left/Right change   Enter use   Q/E tab   F5 close
 ```
 
 ## What's in it
@@ -39,7 +39,7 @@ Risky one-way actions (unlocks, Kill All, Turn Everything Off) need **Enter twic
 
 | Key | |
 |---|---|
-| **F6** | open / close |
+| **F5** | open / close |
 | **Up / Down** | select a row |
 | **Left / Right** | change the value |
 | **Enter** | toggle, or run an action |
