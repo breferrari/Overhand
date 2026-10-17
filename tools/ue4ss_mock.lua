@@ -24,6 +24,7 @@ local function newMock(className)
         ToString = function() return fields.__className end,
         K2_GetActorLocation = function() return { X = 100.0, Y = 200.0, Z = 300.0 } end,
         GetControlRotation = function() return { Pitch = 0.0, Yaw = 90.0, Roll = 0.0 } end,
+        IsInputKeyDown = function(key) return Mock.keysDown[key.KeyName:ToString()] == true end,
     }
     setmetatable(mock, {
         __index = function(_, key)
@@ -43,6 +44,7 @@ Mock.controller.Pawn = newMock("BP_PlayerCharacter_C")
 Mock.worldReady = false   -- false: main menu (no player controller found)
 
 Mock.keyBinds = {}
+Mock.keysDown = {}   -- controller buttons held, by FKey name
 Mock.loop = nil
 Mock.printed = {}
 

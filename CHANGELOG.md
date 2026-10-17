@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0 (2026-10-17)
+
+- **Controller support:** L3 + R3 opens and closes the menu; D-pad selects and changes (held: repeats), A uses, B closes, LB / RB switch tabs. The first 20 controller commands are logged. Key reading is shared (`Game.IsKeyDown`, also used by NoClip).
+
 ## 1.1.0 (2026-10-17)
 
 - **Health Regeneration** now follows AeonGreyh's Passive Health Regen: health points per second (1–50), a delay after hits, a heal-up-to limit, out-of-combat option; healing goes through the game's attribute system (GASCompanion), so the HUD follows on its own. The install script switches that mod off, so one mod covers everything.

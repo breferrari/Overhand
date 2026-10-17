@@ -1,10 +1,12 @@
 -- ValorianSheet / ui/input.lua
--- Keys and the game's input while the menu is open.
+-- Keyboard and controller input for the menu, and the game's input while the menu is open.
 --
--- Key presses are only queued here; the menu handles them on the game thread in its tick, so no
--- game object is touched from the key callback.
+-- Keyboard presses arrive through UE4SS key binds and are only queued here; the controller is
+-- polled from the menu's tick. The menu handles both on the game thread, so no game object is
+-- touched from a key callback.
 
 local Unreal = require("lib.unreal")
+local Log = require("lib.log")
 local Game = require("game")
 
 local Input = {}
@@ -13,10 +15,10 @@ local try, isValid = Unreal.Try, Unreal.IsValid
 
 local pendingCommands = {}
 
+local function queue(command) pendingCommands[#pendingCommands + 1] = command end
+
 function Input.Bind(key, command)
-    RegisterKeyBind(key, function()
-        pendingCommands[#pendingCommands + 1] = command
-    end)
+    RegisterKeyBind(key, function() queue(command) end)
 end
 
 -- The commands queued since the last call, oldest first.
@@ -24,6 +26,59 @@ function Input.TakePending()
     local commands = pendingCommands
     pendingCommands = {}
     return commands
+end
+
+-- ---------------------------------------------------------------------------
+-- Controller: L3 + R3 (both sticks clicked) opens and closes the menu. While it is open: D-pad
+-- selects and changes (held: repeats), A uses, B closes, LB / RB switch tabs.
+-- ---------------------------------------------------------------------------
+
+local TOGGLE_BUTTONS = { "Gamepad_LeftThumbstick", "Gamepad_RightThumbstick" }
+local MENU_BUTTONS = {
+    { key = "Gamepad_DPad_Up", command = "up", repeats = true },
+    { key = "Gamepad_DPad_Down", command = "down", repeats = true },
+    { key = "Gamepad_DPad_Left", command = "left", repeats = true },
+    { key = "Gamepad_DPad_Right", command = "right", repeats = true },
+    { key = "Gamepad_FaceButton_Bottom", command = "enter" },
+    { key = "Gamepad_FaceButton_Right", command = "close" },
+    { key = "Gamepad_LeftShoulder", command = "previousTab" },
+    { key = "Gamepad_RightShoulder", command = "nextTab" },
+}
+local REPEAT_DELAY, REPEAT_INTERVAL = 0.4, 0.12
+
+local toggleHeld = false
+local held = {}            -- button key -> clock time of its next repeat (while held)
+
+-- Logs the first few controller commands, so a test shows whether presses reach us.
+local function queueFromController(command)
+    Log.Limited("controller", 20, "controller: " .. command)
+    queue(command)
+end
+
+function Input.PollController(menuOpen)
+    -- L3 + R3: L3 is read first, R3 only while L3 is held (one call per tick while closed)
+    local toggleDown = Game.IsKeyDown(TOGGLE_BUTTONS[1]) and Game.IsKeyDown(TOGGLE_BUTTONS[2])
+    if toggleDown and not toggleHeld then queueFromController("toggle") end
+    toggleHeld = toggleDown
+    if not menuOpen then
+        held = {}
+        return
+    end
+    local now = os.clock()
+    for _, button in ipairs(MENU_BUTTONS) do
+        if Game.IsKeyDown(button.key) then
+            local nextRepeatAt = held[button.key]
+            if not nextRepeatAt then
+                queueFromController(button.command)
+                held[button.key] = now + REPEAT_DELAY
+            elseif button.repeats and now >= nextRepeatAt then
+                queueFromController(button.command)
+                held[button.key] = now + REPEAT_INTERVAL
+            end
+        else
+            held[button.key] = nil
+        end
+    end
 end
 
 -- ---------------------------------------------------------------------------

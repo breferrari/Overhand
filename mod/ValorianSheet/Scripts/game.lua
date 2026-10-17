@@ -9,7 +9,7 @@ local Log = require("lib.log")
 local Game = {}
 
 Game.NAME = "ValorianSheet"
-Game.VERSION = "1.1.0"
+Game.VERSION = "1.2.0"
 
 -- CharacterMovement.MovementMode values.
 Game.MOVEMENT_MODE = { FALLING = 3, FLYING = 5 }
@@ -57,6 +57,22 @@ end
 function Game.Movement() return playerComponent("CharacterMovement") end
 function Game.AttributesNotifier() return playerComponent("AttributesNotifierComponent") end
 function Game.AbilitySystem() return playerComponent("AbilitySystemComponent") end
+
+-- Is a key or controller button held? keyName is an Unreal FKey name ("SpaceBar",
+-- "Gamepad_FaceButton_Bottom", ...); the key struct is built once per name.
+local keyStructs = {}
+local function isInputKeyDown(controller, key) return controller:IsInputKeyDown(key) end
+
+function Game.IsKeyDown(keyName)
+    local controller = Game.Controller()
+    if not controller then return false end
+    local key = keyStructs[keyName]
+    if not key then
+        key = { KeyName = FName(keyName) }
+        keyStructs[keyName] = key
+    end
+    return try(isInputKeyDown, controller, key) == true
+end
 
 -- ---------------------------------------------------------------------------
 -- Attribute sets

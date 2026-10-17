@@ -27,14 +27,10 @@ local FLY_BRAKING = 6000
 
 local UP_KEYS = { "SpaceBar", "Gamepad_FaceButton_Bottom" }
 local DOWN_KEYS = { "LeftControl", "C", "Gamepad_FaceButton_Right" }
-local keyStructs = {}
 
 local function anyKeyDown(keyNames)
-    local controller = Game.Controller()
-    if not controller then return false end
     for _, keyName in ipairs(keyNames) do
-        keyStructs[keyName] = keyStructs[keyName] or { KeyName = FName(keyName) }
-        if try(function() return controller:IsInputKeyDown(keyStructs[keyName]) end) == true then return true end
+        if Game.IsKeyDown(keyName) then return true end
     end
     return false
 end

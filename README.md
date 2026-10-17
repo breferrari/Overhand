@@ -2,7 +2,7 @@
 
 **An in-game cheat sheet for Valor Mortis.** One keyboard menu, every cheat, nothing running that you didn't switch on.
 
-Press **F5**, pick a tab, change a value. Every cheat can be switched off at any time and puts the game back to vanilla when you do. Your choices are saved for the next session.
+Press **F5** (or **L3 + R3** on a controller), pick a tab, change a value. Every cheat can be switched off at any time and puts the game back to vanilla when you do. Your choices are saved for the next session.
 
 ```
 VALORIAN SHEET
@@ -19,7 +19,7 @@ HEALTH REGENERATION
   Regeneration                     Off (vanilla)
 
 Ready
-Up/Down select   Left/Right change   Enter use   Q/E tab   F5 close
+Arrows / D-pad select and change   Enter / A use   Q/E / LB RB tab   F5 / B close
 ```
 
 ## What's in it
@@ -37,15 +37,15 @@ Risky one-way actions (unlocks, Kill All, Turn Everything Off) need **Enter twic
 
 ## Controls
 
-| Key | |
-|---|---|
-| **F5** | open / close |
-| **Up / Down** | select a row |
-| **Left / Right** | change the value |
-| **Enter** | toggle, or run an action |
-| **Q / E** | previous / next tab |
-| **Esc** | close |
-| **Mouse** | drag the slider on long lists (Give Item) |
+| Keyboard | Controller | |
+|---|---|---|
+| **F5** | **L3 + R3** (click both sticks) | open / close |
+| **Up / Down** | **D-pad up / down** | select a row (hold to repeat) |
+| **Left / Right** | **D-pad left / right** | change the value (hold to repeat) |
+| **Enter** | **A** | toggle, or run an action |
+| **Q / E** | **LB / RB** | previous / next tab |
+| **Esc** | **B** | close |
+| **Mouse** | | drag the slider on long lists (Give Item) |
 
 While the menu is open the game gets no input, so you don't walk around or open the pause menu by accident. The menu won't open over a game menu, and closes itself when one appears (death screen, message box).
 

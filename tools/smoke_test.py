@@ -67,6 +67,22 @@ def run_mod(mod_folder: pathlib.Path, walk_menu: bool = True) -> list[str]:
         press("E")
     press("Q")
     press("ESCAPE")
+    # Controller: L3 + R3 opens, D-pad / A / LB / RB navigate (D-pad held repeats), B closes.
+    def hold(*buttons, ticks=2):
+        for button in buttons:
+            mock.keysDown[button] = True
+        tick(ticks)
+        for button in buttons:
+            mock.keysDown[button] = None
+        tick()
+
+    hold("Gamepad_LeftThumbstick", "Gamepad_RightThumbstick")
+    for button in ("Gamepad_DPad_Down", "Gamepad_DPad_Right", "Gamepad_FaceButton_Bottom",
+                   "Gamepad_RightShoulder", "Gamepad_LeftShoulder"):
+        hold(button)
+    advance_clock(1)
+    hold("Gamepad_DPad_Down", ticks=20)
+    hold("Gamepad_FaceButton_Right")
     # Let the settings save, then a map change.
     advance_clock(200)
     tick(5)
@@ -78,6 +94,10 @@ def run_mod(mod_folder: pathlib.Path, walk_menu: bool = True) -> list[str]:
     undefined = sorted({str(mock.undefinedGlobals[i]) for i in range(1, len(mock.undefinedGlobals) + 1)})
     if undefined:
         problems.append("undefined globals read: " + ", ".join(undefined))
+    if walk_menu and "controller: toggle" not in log:
+        problems.append("controller: L3 + R3 did not open the menu")
+    if walk_menu and "controller: close" not in log:
+        problems.append("controller: B did not close the menu")
     if "loaded, press F5" not in log:
         printed = "\n".join(str(mock.printed[i]) for i in range(1, len(mock.printed) + 1))
         problems.append("mod did not finish loading:\n" + printed)

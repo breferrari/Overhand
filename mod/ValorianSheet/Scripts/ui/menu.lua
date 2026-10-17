@@ -5,6 +5,7 @@
 --   F5 / Esc       open / close          Up / Down      select a row
 --   Left / Right   change the value      Enter          toggle / run (twice for risky actions)
 --   Q / E          previous / next tab
+-- Controller (ui/input.lua): L3 + R3 open / close, D-pad, A, B (close), LB / RB.
 --
 -- The menu content is defined in ui/sheet.lua; this file only knows the item kinds.
 -- Everything runs on the game thread from Menu.Tick; while the menu is closed a tick only looks at
@@ -25,7 +26,7 @@ local COLORS = Widgets.COLORS
 local try, isValid = Unreal.Try, Unreal.IsValid
 
 local TITLE = "VALORIAN SHEET"
-local HINT = "Up/Down select   Left/Right change   Enter use   Q/E tab   F5 close"
+local HINT = "Arrows / D-pad select and change   Enter / A use   Q/E / LB RB tab   F5 / B close"
 local MIN_WIDTH = 460
 local SLIDER_WIDTH = 150
 local VALUE_WIDTH = 120
@@ -498,6 +499,7 @@ function Menu.BindKeys()
 end
 
 function Menu.Tick()
+    Input.PollController(view.open)
     for _, command in ipairs(Input.TakePending()) do
         Log.Guarded("menu command " .. command, handleCommand, command)
     end
