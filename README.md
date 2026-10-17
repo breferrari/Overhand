@@ -1,66 +1,81 @@
-# Overhand
+<p align="center">
+  <img src="docs/images/banner.png" alt="Overhand">
+</p>
 
-![Overhand](docs/images/banner.png)
+<p align="center">
+  <b>In-game cheat menus for Unreal Engine games, built on UE4SS.</b><br>
+  One menu. Every cheat. Off means vanilla.
+</p>
 
-**In-game cheat menus for Unreal Engine games, built on UE4SS.** One menu, every cheat, nothing running that you didn't switch on.
+<p align="center">
+  <img src="https://img.shields.io/badge/UE4SS-Lua%205.4-2f6fb5?style=flat-square" alt="UE4SS Lua 5.4">
+  <img src="https://img.shields.io/badge/made%20for-Unreal%20Engine-1f1f1f?style=flat-square&logo=unrealengine&logoColor=white" alt="Made for Unreal Engine">
+  <img src="https://img.shields.io/badge/platform-Windows-0078d4?style=flat-square" alt="Windows">
+  <img src="https://img.shields.io/badge/stores-Steam%20%7C%20Xbox%20%7C%20Epic%20%7C%20GOG-555?style=flat-square" alt="Steam, Xbox app, Epic Games, GOG">
+  <img src="https://img.shields.io/badge/license-MIT-3a3?style=flat-square" alt="MIT license">
+</p>
 
-Press **F5** (or **L3 + R3** on a controller), pick a tab, change a value. Every cheat can be switched off at any time and puts the game back to vanilla when you do. Your choices are saved for the next session.
+<p align="center">
+  <img src="docs/images/menu.png" width="560" alt="The Overhand menu in Valor Mortis">
+</p>
 
-<p align="center"><img src="docs/images/menu.png" width="480" alt="The Overhand menu in Valor Mortis"></p>
+Press **F5**, or click **both sticks** on a controller, pick a tab and change a value. That's it.
 
-Every row says what it does while it's selected, rows changed from vanilla carry a red mark (and each tab counts them), and the footer shows only the buttons that do something on the selected row. Each game brings its own theme; this is Valor Mortis', set in Cinzel and Barlow Semi Condensed, which ship with the mod.
+## Highlights
 
-One repo holds the shared framework and every supported game. Installing builds a mod for **one** game from only what that game needs.
+- **Off means vanilla.** Every cheat can be switched off at any time and puts the game back exactly as it was. Nothing runs that you didn't switch on.
+- **Controller first, keyboard too.** Full menu control from a gamepad; the footer shows only the buttons that do something on the selected row, for the device you opened it with.
+- **Explains itself.** Every row says what it does; rows changed from vanilla carry a red mark, and each tab counts them.
+- **Remembers you.** Your choices are saved for the next session.
+- **Costs nothing when closed.** No per-tick object searches: every game object is found once and kept ([details](docs/PERFORMANCE.md)).
+- **Safe by default.** One-way actions ask twice; the menu stays out of the way of the game's own menus.
+- **Each game looks like itself.** Every game brings its own theme: palette, mark and fonts.
 
 ## Games
 
-| Game | Folder | Status |
+| Game | Engine | Cheats |
 |---|---|---|
-| **Valor Mortis** | `games/valormortis/` | Survival, movement, teleport, combat, items, give: [details below](#valor-mortis) |
+| [**Valor Mortis**](docs/games/valormortis.md) | UE 5.7 | Survival, movement, teleport, combat, items, give, quests: [see them all](docs/games/valormortis.md#cheats) |
 
-Adding a game: [docs/PORTING.md](docs/PORTING.md) (worked example: Atomic Heart).
+Want another game? [Adding a game](docs/PORTING.md) walks through it.
 
-## Controls
+## Quick start
 
-| Keyboard | Controller | |
-|---|---|---|
-| **F5** | **L3 + R3** (click both sticks) | open / close |
-| **Up / Down** | **D-pad up / down** | select a row (hold to repeat) |
-| **Left / Right** | **D-pad left / right** | change the value (hold to repeat) |
-| **Enter** | **A** | toggle, run an action, or open a list (then Left / Right a page, pick with Enter / A, back with Esc / B) |
-| **Q / E** | **LB / RB** | previous / next tab |
-| **Esc** | **B** | close |
+1. **Install [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases)** for the game. UE 5.6 and newer need the [experimental-latest](https://github.com/UE4SS-RE/RE-UE4SS/releases/tag/experimental-latest) build. Recommended: `bForceGUObjectArrayForIteration = true` in `ue4ss\UE4SS-settings.ini`.
+2. **Get Overhand:** clone this repo or download it as a ZIP.
+3. **Install it** with the game closed:
+   ```powershell
+   .\tools\install.ps1 -Game valormortis
+   ```
+   The installer finds the game in your Steam libraries, Xbox app / Game Pass folders (any drive), Epic Games and GOG installs.
+4. **Play.** Load a save and press **F5** (or **L3 + R3**).
 
-The footer shows the buttons of the device you opened the menu with (or the game's own button icons, once mapped), and only those that do something on the selected row. While the menu is open your character doesn't move, look around or act. The menu won't open over a game menu, and closes itself when one appears. Risky one-way actions need **Enter (or A) twice**.
-
-## Install
-
-**Requirements**
-- [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) for the game's engine version (UE 5.6+ needs the **experimental-latest** build).
-- Recommended: `bForceGUObjectArrayForIteration = true` in `ue4ss\UE4SS-settings.ini` (the community "Crash Fix").
-
-**Install a game's mod** (the game must be closed):
+<details>
+<summary><b>More install options</b></summary>
 
 ```powershell
-.\tools\install.ps1 -Game valormortis
 .\tools\install.ps1 -Game valormortis -GameDir "E:\Games\Valor Mortis"   # when it isn't found, or is installed twice
 .\tools\install.ps1 -Game valormortis -Uninstall
-.\tools\install.ps1 -Game valormortis -BuildOnly      # only assemble build\valormortis\Overhand\
+.\tools\install.ps1 -Game valormortis -BuildOnly                           # only assemble build\valormortis\Overhand\
 ```
 
-The script finds the game in your Steam libraries, Xbox app / Game Pass folders (any drive), Epic Games and GOG installs, and UE4SS in it (`ue4ss\Mods`, or `Mods` for older UE4SS, under `Binaries\Win64` or `WinGDK`). It assembles `build\<game>\Overhand\` and copies it into that Mods folder:
+`-GameDir` takes the game's folder, its `Content` folder (Xbox app) or its `Binaries\Win64` folder. The installer puts the mod in UE4SS's Mods folder (`ue4ss\Mods`, or `Mods` for older UE4SS) and keeps your settings and teleports across installs. A game update or a store's "repair" / "verify files" can remove UE4SS and the mod: install again afterwards.
+
+What gets installed, built from only what that game needs:
 
 ```
-Scripts\main.lua    src\main.lua
-Scripts\core\       src\core\
-Scripts\gas\        src\gas\           (only for games that use GAS)
-Scripts\game\       games\<game>\      (only that game)
-assets\             assets\            (the menu's mark, arrows, button disc, fonts)
+Mods\Overhand\
+  Scripts\main.lua    src\main.lua
+  Scripts\core\       src\core\
+  Scripts\gas\        src\gas\           (only for games that use GAS)
+  Scripts\game\       games\<game>\      (only that game)
+  assets\             assets\            (the menu's mark, arrows, button disc, fonts)
 ```
 
-A game update or a store's "repair" / "verify files" can remove UE4SS and the mod; install again afterwards. Your `settings.cfg` and teleports are kept across installs.
+</details>
 
-## Files it writes
+<details>
+<summary><b>Files it writes</b></summary>
 
 All inside `Mods\Overhand\`:
 
@@ -71,36 +86,35 @@ All inside `Mods\Overhand\`:
 | `Overhand.log`, `.log.old` | this session and the previous one |
 | `Overhand-BugReport.txt` | only when you press *Write bug report* |
 | `Overhand-ButtonIcons.txt` | only when you press *Find controller button icons* |
-| `Overhand-Quests.txt` | only when you press *Write quest report* (Valor Mortis) |
+| `Overhand-<report>.txt` | only when you press a game's own report action |
 
-## Valor Mortis
+</details>
 
-| Tab | Cheats |
-|---|---|
-| **Survival** | God Mode · Infinite Stamina (optionally only out of combat) · Stamina Cost 100–25 % (attacks, dodges, blocks) · Infinite Nephtoglobin · Fall Damage 100–0 % · Damage Taken 100–10 % (through the game's own resistances) · Max Health up to 5x (the health bar keeps its length) · Health Regeneration 1–50 HP/s with a delay after hits, a heal-up-to limit and an out-of-combat option |
-| **Movement** | NoClip (Space or A up, Ctrl, C or B down) · Movement Speed up to 5x · Jump Height up to 10x · Game Speed 0.25–2x · Toggle Sprint for keyboard · Instant Sprint · **Teleport**: 5 saved positions per area |
-| **Combat** | One-Hit Kills · Damage Multiplier up to 10x · Every Block Is A Perfect Parry (two-handed weapons too) · Claymore Can Parry · Parry Window 0.5–6x · Dodge Window 0.5–4x · Kill All Enemies Nearby (60 m) |
-| **Items** | Infinite Ammo (optionally still reloading) · Infinite Healing Flasks · Infinite Consumables · Infinite Buffs (potions, coatings, pistol boosts) · No Item Cooldowns · Keep Catalysts On Death (also deaths without a deathmark) · No Ability Costs · Free Respec · Refill Everything |
-| **Give** | +1,000 / +10,000 Catalysts · +99 of every upgrade material · +5 of every consumable · Unlock all weapons / abilities / gems · **Give Item**: any consumable, material, instant or quest item from a list, 1–999 at a time (the count is checked afterwards) |
-| **Quests** | Your active quests and what each one's current step asks for (read only) · Refresh the list · Write quest report |
-| **Misc** | Turn everything off · Debug logging · Write bug report · Find controller button icons |
+## Controls
 
-## Performance
+| Keyboard | Controller | |
+|---|---|---|
+| **F5** | **L3 + R3** (click both sticks) | open / close |
+| **↑ / ↓** | **D-pad ↑ / ↓** | select a row (hold to repeat) |
+| **← / →** | **D-pad ← / →** | change the value (hold to repeat) |
+| **Enter** | **A** | toggle, run an action, or open a list |
+| **Q / E** | **LB / RB** | previous / next tab |
+| **Esc** | **B** | close (or leave a list) |
 
-The menu does no work while it's closed beyond reading a key queue and one controller button, and cheats that are off cost nothing. No object search runs on a per-tick path: every game object is found once and kept. Details in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+In an open list, **← / →** moves a page. While the menu is open your character doesn't move, look around or act. The menu won't open over a game menu and closes itself when one appears.
 
-## How it works
+## Under the hood
 
 ```
-games/<game>/     one folder per game: wiring, game access, features, menu content, manifest
-src/gas/          Gameplay Ability System helpers (any GAS game)
+src/main.lua      entry point
 src/core/         the menu, input, settings, logging, safe Unreal access, the per-tick loop
-src/main.lua      entry point: loads game/init.lua
+src/gas/          Gameplay Ability System helpers (any GAS game)
+games/<game>/     one folder per game: wiring, game access, features, menu content, manifest
 ```
 
-`src/core/` knows no game and no GAS; `src/gas/` knows no game. A game passes core what it needs (player, controller, its menu widgets) and registers its features. Each cheat is a small feature module with a tick that applies your settings; the menu only writes settings. Layout and rules: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+One repo holds the shared framework and every game; installing builds a mod for **one** game. Layers only point down: `core` knows no game and no GAS, `gas` knows no game. Each cheat is a small feature module whose tick applies your settings; the menu only writes settings. More in [Architecture](docs/ARCHITECTURE.md).
 
-## Development
+## Contributing
 
 ```powershell
 pip install lupa
@@ -108,18 +122,16 @@ python tools\smoke_test.py               # every game
 python tools\smoke_test.py valormortis   # one game
 ```
 
-For every game the smoke test assembles the mod the way the installer does, compiles it with Lua 5.4 (what UE4SS embeds), checks the layers, and loads it against mock UE4SS objects: main menu, a loaded save with the features ticking, every row of every tab with keyboard and controller, a map change, and the first-start settings file. It catches syntax, wiring and load errors; game behaviour still needs the game.
+The smoke test assembles each game's mod like the installer, compiles it with Lua 5.4 (what UE4SS embeds), checks the layers, and runs it against mocked UE4SS: the main menu, a loaded save with the features ticking, every row of every tab with keyboard and controller, a map change and a first start. It catches syntax, wiring and load errors; game behaviour still needs the game.
 
-## Docs
-
-| | |
+| Docs | |
 |---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, how a game's mod is assembled, every module, the rules |
-| [docs/PORTING.md](docs/PORTING.md) | Adding a game (worked example: Atomic Heart) |
-| [docs/DISCOVERY.md](docs/DISCOVERY.md) | Finding a game's internals with UE4SS: dumps, Live View, hooks, testing, pitfalls, reviewing other mods |
-| [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | What costs what, and the per-path budget |
-| [docs/games/valormortis.md](docs/games/valormortis.md) | Valor Mortis' internals: classes, attributes, damage functions, effects, items, menus |
-| [CHANGELOG.md](CHANGELOG.md) | Every version |
+| [Architecture](docs/ARCHITECTURE.md) | Layers, how a game's mod is assembled, every module, the rules |
+| [Adding a game](docs/PORTING.md) | A new game, step by step (worked example: Atomic Heart) |
+| [Discovery](docs/DISCOVERY.md) | Finding a game's internals with UE4SS: dumps, Live View, hooks, testing, pitfalls |
+| [Performance](docs/PERFORMANCE.md) | What costs what, and the per-path budget |
+| [Valor Mortis](docs/games/valormortis.md) | The game's cheats and internals: classes, attributes, damage functions, effects, items, menus |
+| [Changelog](CHANGELOG.md) | Every version |
 
 ## Credits
 

@@ -24,7 +24,7 @@ assets/             assets/           (the menu's mark, arrows, button disc, fon
 
 UE4SS loads `Scripts/main.lua`; everything else is a module loaded with `require`, resolved from `Scripts/` (`require("core.ui.menu")` is `Scripts/core/ui/menu.lua`). A game's own modules are always required as `game.*` (`require("game.features.health")`), so game code never knows its folder name in the repo. The smoke test assembles every game the same way.
 
-Each game also has a reference of its internals in `docs/games/<game>.md`.
+Each game also has its page in `docs/games/<game>.md`: its cheats (what players see, linked from the README), then a reference of its internals.
 
 `manifest.json` holds what the installer and the smoke test need: the game's folder names (`installFolders`, as Steam, the Xbox app, Epic or GOG name its folder; the installer finds the install) and Unreal project folder (`projectFolder`, which holds `Binaries\Win64` or `WinGDK`), its process name, whether it uses GAS, and the smoke test's expectations.
 

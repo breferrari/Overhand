@@ -1,4 +1,26 @@
-# Valor Mortis internals
+# Valor Mortis
+
+Overhand for **Valor Mortis** (Unreal Engine 5.7): the cheats in the menu, then what we know about the game's internals.
+
+Install: `.\tools\install.ps1 -Game valormortis` (see the [README](../../README.md#quick-start)).
+
+## Cheats
+
+| Tab | Cheats |
+|---|---|
+| **Survival** | God Mode · Infinite Stamina (optionally only out of combat) · Stamina Cost 100–25 % (attacks, dodges, blocks) · Infinite Nephtoglobin · Fall Damage 100–0 % · Damage Taken 100–10 % (through the game's own resistances) · Max Health up to 5x (the health bar keeps its length) · Health Regeneration 1–50 HP/s with a delay after hits, a heal-up-to limit and an out-of-combat option |
+| **Movement** | NoClip (Space or A up, Ctrl, C or B down) · Movement Speed up to 5x · Jump Height up to 10x · Game Speed 0.25–2x · Toggle Sprint for keyboard · Instant Sprint · **Teleport**: 5 saved positions per area |
+| **Combat** | One-Hit Kills · Damage Multiplier up to 10x · Every Block Is A Perfect Parry (two-handed weapons too) · Claymore Can Parry · Parry Window 0.5–6x · Dodge Window 0.5–4x · Kill All Enemies Nearby (60 m) |
+| **Items** | Infinite Ammo (optionally still reloading) · Infinite Healing Flasks · Infinite Consumables · Infinite Buffs (potions, coatings, pistol boosts) · No Item Cooldowns · Keep Catalysts On Death (also deaths without a deathmark) · No Ability Costs · Free Respec · Refill Everything |
+| **Give** | +1,000 / +10,000 Catalysts · +99 of every upgrade material · +5 of every consumable · Unlock all weapons / abilities / gems · **Give Item**: any consumable, material, instant or quest item from a list, 1–999 at a time (the count is checked afterwards) |
+| **Quests** | Your active quests and what each one's current step asks for (read only) · Refresh the list · Write quest report (`Overhand-Quests.txt`) |
+| **Misc** | Turn everything off · Debug logging · Write bug report · Find controller button icons |
+
+The menu's theme (Cinzel and Barlow Semi Condensed, which ship with the mod) is this game's.
+
+---
+
+# Internals
 
 What we know about Valor Mortis' internals, and how Overhand uses each part. Marked **confirmed in game** where an in-game test or log showed it working (as of 2026-10-17); the rest comes from reading the game through code that runs (it may still need a check after a game update).
 

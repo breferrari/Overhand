@@ -24,7 +24,7 @@ The real work for a new game is **finding its internals**: which class is the pl
 
 ### 1. Find the internals
 
-Follow [DISCOVERY.md](DISCOVERY.md): dump objects and headers in a loaded save (Ctrl+J, Ctrl+H), map the classes, confirm in Live View. Write what you find in `docs/games/<game>.md` ([valormortis.md](games/valormortis.md) is the example). Look for:
+Follow [DISCOVERY.md](DISCOVERY.md): dump objects and headers in a loaded save (Ctrl+J, Ctrl+H), map the classes, confirm in Live View. Write what you find in `docs/games/<game>.md`, which opens with the game's cheat list (linked from the README's Games table) ([valormortis.md](games/valormortis.md) is the example). Look for:
 
 | What | Valor Mortis | Atomic Heart (to find) |
 |---|---|---|
