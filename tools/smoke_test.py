@@ -23,6 +23,20 @@ MOCK = REPO / "tools" / "ue4ss_mock.lua"
 TAB_COUNT = 6
 ROWS_PER_TAB = 14   # more than any tab has, so every row is visited
 
+def check_layers() -> list[str]:
+    """core/ knows no game and no GAS; gas/ knows no game (so both carry over to another game)."""
+    errors = []
+    scripts = MOD / "Scripts"
+    forbidden = {"core": ("games.", "gas."), "gas": ("games.",)}
+    for layer, prefixes in forbidden.items():
+        for path in sorted((scripts / layer).rglob("*.lua")):
+            text = path.read_text(encoding="utf-8")
+            for prefix in prefixes:
+                if 'require("' + prefix in text:
+                    errors.append(f"{path.relative_to(REPO)} requires {prefix}* ({layer}/ must not)")
+    return errors
+
+
 def compile_all() -> list[str]:
     errors = []
     lua = lua54.LuaRuntime()
@@ -96,6 +110,8 @@ def run_mod(mod_folder: pathlib.Path, walk_menu: bool = True) -> list[str]:
         problems.append("undefined globals read: " + ", ".join(undefined))
     if walk_menu and "controller: toggleWithController" not in log:
         problems.append("controller: L3 + R3 did not open the menu")
+    if walk_menu and "button icons:" not in log:
+        problems.append("Misc > Find controller button icons did not run")
     if walk_menu and "controller: close" not in log:
         problems.append("controller: B did not close the menu")
     if "loaded, press F5" not in log:
@@ -132,6 +148,11 @@ def main() -> int:
         print("Compile errors:\n" + "\n".join(errors))
         return 1
     print("compile: ok")
+    layer_errors = check_layers()
+    if layer_errors:
+        print("Layer errors:\n" + "\n".join(layer_errors))
+        return 1
+    print("layers: ok")
     tests = (("load + ticks + menu", test_menu_walk), ("first start writes settings.cfg", test_first_start))
     for name, test in tests:
         problems = test()

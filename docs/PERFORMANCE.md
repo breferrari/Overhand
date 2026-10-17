@@ -21,7 +21,7 @@ Per-tick or timer paths in the original that ran full object searches, found by 
 
 ## How ValorianSheet finds objects
 
-All searches go through `lib/unreal.lua`, the one place allowed to call `FindAllOf`:
+All searches go through `core/unreal.lua`, the one place allowed to call `FindAllOf`:
 
 - `Unreal.FindCached(key, class, retry, accept)`: the first matching object, kept while valid. After a miss, no new search for `retry` seconds.
 - `Unreal.FindAllCached(key, class, retry)`: every live object of a class, kept; searched again only when none of them is alive, then at most every `retry` seconds.

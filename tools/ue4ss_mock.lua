@@ -70,7 +70,7 @@ Key = setmetatable({}, { __index = function(_, name) return name end })
 -- Strict globals: reading an undefined global (a typo) or creating an unexpected one is an error.
 -- Reads are also recorded, because the mod wraps most calls in pcall (Unreal.Try), which would
 -- swallow the error.
-local ALLOWED_NEW_GLOBALS = { ValorianSheetTick = true, ValorianSheetTickHandle = true }
+local ALLOWED_NEW_GLOBALS = { ModTick = true, ModTickHandle = true }
 Mock.undefinedGlobals = {}
 setmetatable(_G, {
     __index = function(_, name)

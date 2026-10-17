@@ -79,6 +79,7 @@ All inside `Mods\ValorianSheet\`:
 | `teleports.txt` | saved positions |
 | `ValorianSheet.log`, `.log.old` | this session and the previous one |
 | `ValorianSheet-BugReport.txt` | only when you press *Write bug report* |
+| `ValorianSheet-ButtonIcons.txt` | only when you press *Find controller button icons* |
 
 ## Performance
 
@@ -86,7 +87,9 @@ The menu does no work while it's closed beyond reading a key queue, and cheats t
 
 ## How it works
 
-Each cheat is a small module in `Scripts/features/` with a `Tick` that applies your settings; per-world state is dropped through one world reset. The menu only writes settings; everything is applied on the game thread from one loop. Layout and conventions: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+The code is in three layers: `core/` (the menu, input, settings, safe Unreal access, the per-tick loop) and `gas/` (Gameplay Ability System helpers) know no game; `games/valormortis/` is everything Valor Mortis. Each cheat is a small feature module with a tick that applies your settings; the menu only writes settings. Layout and rules: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+**Another game?** `core/` and `gas/` carry over as they are; a new game is a new `games/<name>/` folder. Guide (with Atomic Heart as the example): [docs/PORTING.md](docs/PORTING.md).
 
 ## Development
 

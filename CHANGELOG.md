@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0 (2026-10-17)
+
+- **Layers for other games:** the code is split into `core/` (menu, input, settings, logging, lookups, overrides, the per-tick runner; knows no game), `gas/` (Gameplay Ability System helpers) and `games/valormortis/`. Games pass core what it needs (`Menu.Configure`, `Runner.Configure`, `Gas.Configure`) and register their features, settings stores and bug report sections. The smoke test enforces that core and gas stay game-free. Guide: [docs/PORTING.md](docs/PORTING.md).
+- **Button chips:** the hint row draws every key and button as a keycap chip, and shows only the device the menu was opened with (keyboard or controller). Confirm prompts say "A again" when opened with the controller.
+- **Button icons:** Misc → *Find controller button icons* writes the game's loaded button images to `ValorianSheet-ButtonIcons.txt`; configured icons (`buttonIcons`) replace the chips.
+- `settings.cfg`, the ledger and teleports are separate stores (`Settings.RegisterLines` / `RegisterFile`); the file formats are unchanged.
+
 ## 1.2.0 (2026-10-17)
 
 - **Controller support:** L3 + R3 opens and closes the menu; D-pad selects and changes (held: repeats), A uses, B closes, LB / RB switch tabs. The first 20 controller commands are logged. Key reading is shared (`Game.IsKeyDown`, also used by NoClip).
