@@ -3,6 +3,7 @@
 ## 1.1.0 (2026-10-17)
 
 - **Health Regeneration** now follows AeonGreyh's Passive Health Regen: health points per second (1–50), a delay after hits, a heal-up-to limit, out-of-combat option; healing goes through the game's attribute system (GASCompanion), so the HUD follows on its own. The install script switches that mod off, so one mod covers everything.
+- **Damage Taken** now follows AeonGreyh's Defense Multiplier: it raises William's resistance attributes (live value only, nothing saved) so the game's own damage math reduces every hit. The damage hooks no longer scale incoming damage except for God Mode, and the heal-back fallback is gone.
 - **Combat check** uses the world's EnemyInfoSubsystem (the check Passive Health Regen uses), for regeneration and Infinite Stamina's out-of-combat option.
 - **Cleanup** (`/simplify`):
   - one world reset (`Unreal.ResetWorld`, `Unreal.OnWorldReset`) instead of hand-wired resets

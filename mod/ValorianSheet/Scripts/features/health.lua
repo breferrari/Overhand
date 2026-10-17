@@ -1,6 +1,6 @@
 -- ValorianSheet / features/health.lua
--- Survival: God Mode, Infinite Stamina / Nephtoglobin, Fall Damage, Damage Taken, Max Health and
--- Health Regeneration.
+-- Survival: God Mode, Infinite Stamina / Nephtoglobin, Fall Damage, Max Health and Health
+-- Regeneration. (Damage Taken is features/defense.lua.)
 
 local Unreal = require("lib.unreal")
 local Log = require("lib.log")
@@ -106,55 +106,29 @@ local function applyFallDamageCurve()
 end
 
 -- ---------------------------------------------------------------------------
--- Max Health and Damage Taken
 -- Max Health: MaxHealth times the factor; current health is scaled with it so the bar keeps its fill.
--- Damage Taken: the damage hooks (features/damage.lua) scale hits before they land. For damage that
--- does not go through those functions, (1 - factor) of every loss is given back right after the hit.
 -- ---------------------------------------------------------------------------
 
 local maxHealthOverride = Override.new()
-local lastHealth = nil
 
-local function applyMaxHealthAndDamageTaken()
+local function applyMaxHealth()
     local factor = State.settings.maxHealthFactor or 1
-    local damageTaken = State.settings.damageTaken or 1
-    if factor == 1 and State.appliedMaxHealthFactor == 1 and not maxHealthOverride:isActive() and damageTaken >= 1 then
-        lastHealth = nil
-        return
-    end
+    if factor == 1 and State.appliedMaxHealthFactor == 1 and not maxHealthOverride:isActive() then return end
     local healthSet = Game.AttributeSet("Health")
-    if not healthSet then
-        lastHealth = nil
-        return
-    end
-
+    if not healthSet then return end
     if factor ~= 1 then
         maxHealthOverride:attribute(healthSet, "MaxHealth", factor)
     elseif maxHealthOverride:isActive() then
         maxHealthOverride:restore()
     end
-    if factor ~= State.appliedMaxHealthFactor then
-        local _, health, maxHealth = Game.PlayerHealth()
-        if health and health > 0 then
-            local scaledHealth = math.min(health * factor / State.appliedMaxHealthFactor, maxHealth)
-            Game.SetAttribute(healthSet, "Health", scaledHealth)
-            Log.Debug("max health x" .. factor .. ": MaxHealth=" .. maxHealth .. ", Health " .. health .. " -> " .. scaledHealth)
-        end
-        State.appliedMaxHealthFactor = factor
-        lastHealth = nil -- our own change, not damage
-    end
-
+    if factor == State.appliedMaxHealthFactor then return end
     local _, health, maxHealth = Game.PlayerHealth()
-    if not health then return end
-    local tookHit = lastHealth and health < lastHealth - 0.5 and health > 0
-    if damageTaken < 1 and tookHit and not Damage.ReducedRecently() then
-        local loss = lastHealth - health
-        healTo(healthSet, health, maxHealth, health + loss * (1 - damageTaken))
-        local healthAfter = Game.GetAttribute(healthSet, "Health") or health
-        Log.Debug(string.format("damage taken %.0f%% (fallback): lost %.1f, gave back %.1f", damageTaken * 100, loss, healthAfter - health))
-        health = healthAfter
+    if health and health > 0 then
+        local scaledHealth = math.min(health * factor / State.appliedMaxHealthFactor, maxHealth)
+        Game.SetAttribute(healthSet, "Health", scaledHealth)
+        Log.Debug("max health x" .. factor .. ": MaxHealth=" .. maxHealth .. ", Health " .. health .. " -> " .. scaledHealth)
     end
-    lastHealth = health
+    State.appliedMaxHealthFactor = factor
 end
 
 -- ---------------------------------------------------------------------------
@@ -270,14 +244,13 @@ function Health.Tick()
     Log.Guarded("fall damage", applyFallDamageCurve)
     Log.Guarded("health regeneration", regenerateHealth)
     Log.Guarded("damage hooks", Damage.Tick)
-    Log.Guarded("max health and damage taken", applyMaxHealthAndDamageTaken)
+    Log.Guarded("max health", applyMaxHealth)
     Log.Guarded("health bar length", Hud.KeepHealthBarLength) -- after Max Health was applied this tick
 end
 
 Unreal.OnWorldReset(function()
     maxHealthOverride:release()
     State.appliedMaxHealthFactor = 1
-    lastHealth = nil
     regen.lastHealth, regen.lastStepAt = nil, nil
     -- fallCurve is not reset: the curve is a game asset that outlives the world, and resetting would
     -- take our scaled values for the originals. A different curve is noticed by its address.

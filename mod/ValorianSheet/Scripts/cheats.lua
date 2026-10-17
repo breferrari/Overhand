@@ -9,6 +9,7 @@ local Game = require("game")
 local State = require("state")
 local Settings = require("settings")
 local Health = require("features.health")
+local Defense = require("features.defense")
 local Movement = require("features.movement")
 local Combat = require("features.combat")
 local Resources = require("features.resources")
@@ -26,6 +27,7 @@ local SAVED_VALUES_RETRY = 0.5
 local FEATURES = {
     { name = "dev actions", tick = DevActions.Tick },
     { name = "health", tick = Health.Tick },
+    { name = "damage taken", tick = Defense.Tick },
     { name = "resources", tick = Resources.Tick },
     { name = "movement", tick = Movement.Tick },
     { name = "combat", tick = Combat.Tick },

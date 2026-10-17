@@ -1,7 +1,8 @@
 -- ValorianSheet / features/damage.lua
 -- Scaling damage before it lands. The game deals damage through MTCombatUtils functions; we hook
 -- them and scale the damage values:
---   incoming (target is William): God Mode = 0, otherwise the Damage Taken share
+--   incoming (target is William): God Mode blocks it (Damage Taken works on resistances instead,
+--     see features/defense.lua)
 --   outgoing (attacker is William or something he fired): One-Hit Kills / Damage Multiplier
 -- Only the hit is changed, nothing is saved. The hooks are registered once, the first time any of
 -- these cheats is on, and do nothing while they are all off.
@@ -18,7 +19,6 @@ local try, isValid = Unreal.Try, Unreal.IsValid
 local ONE_HIT_FACTOR = 100000
 
 local hooksRegistered = false
-local lastIncomingAt = -math.huge
 local callDepth = 0
 
 -- Hooked function -> parameter positions (1-based, after the context object) of the damage values,
@@ -57,11 +57,9 @@ local function onDamage(functionName, ...)
     local settings = State.settings
 
     if Game.IsPlayer(targetParam and try(function() return targetParam:get() end)) then
-        local factor = settings.godMode and 0 or (settings.damageTaken or 1)
-        if factor >= 1 then return end
-        scaleDamage(layout, params, factor)
-        lastIncomingAt = os.clock()
-        Log.Limited("incoming damage", 3, "damage reduced before the hit (" .. functionName .. ")")
+        if not settings.godMode then return end
+        scaleDamage(layout, params, 0)
+        Log.Limited("incoming damage", 3, "God Mode blocked a hit (" .. functionName .. ")")
         return
     end
 
@@ -88,14 +86,10 @@ local function registerHooks()
     Log.Info("damage: hooked " .. hooked .. " damage functions")
 end
 
--- Did a hook reduce incoming damage in the last half second? (then the fallback in health.lua waits)
-function Damage.ReducedRecently() return os.clock() - lastIncomingAt < 0.5 end
-
 function Damage.Tick()
     if hooksRegistered then return end
     local settings = State.settings
-    if (settings.damageTaken or 1) < 1 or settings.godMode or settings.oneHitKills
-        or (settings.damageMultiplier or 1) ~= 1 then
+    if settings.godMode or settings.oneHitKills or (settings.damageMultiplier or 1) ~= 1 then
         registerHooks()
     end
 end

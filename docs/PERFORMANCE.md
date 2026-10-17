@@ -40,7 +40,7 @@ Everything kept is per world and dropped by the single world reset when a new Wi
 
 ## Per-tick work
 
-- **Cheats that are off** return before any lookup: fall damage at 100 %, regeneration off, Max Health 1x with Damage Taken 100 %, the health bar, damage hooks once registered.
+- **Cheats that are off** return before any lookup: fall damage at 100 %, regeneration off, Max Health 1x, Damage Taken 100 %, the health bar, damage hooks once registered.
 - **Active effects** (Dodge Window, Infinite Buffs, the debug effect log) share one read of William's effect list per tick (`Game.ActiveEffects`). Effect class names are cached per definition. Dodge Window only reads the list when its length changes (a dodge adds effects) or while an early removal is pending.
 - **Consumables:** one poll of 34 item counts, every 0.25 s while Infinite Consumables is on, every 1 s otherwise (for Refill Everything). Item tag structs are built once.
 - **The hottest helpers** (`IsValid`, `AddressOf`, attribute reads) call module-level functions, so they allocate no closure per call.
@@ -50,6 +50,7 @@ Everything kept is per world and dropped by the single world reset when a new Wi
 | Infinite Buffs | 0.1 s while on, 0.5 s while off |
 | No Item Cooldowns | 0.25 s |
 | Health Regeneration | a step every 0.25 s while healing |
+| Damage Taken | 4 resistance reads per tick while below 100 % |
 | Health bar length | 0.2 s while Max Health is raised |
 
 ## The menu

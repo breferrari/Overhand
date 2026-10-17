@@ -11,7 +11,7 @@ State.settings = {
     staminaOnlyOutOfCombat = false,
     infiniteNephtoglobin = false,
     fallDamage = 1,
-    damageTaken = 1,
+    damageTaken = 1,            -- share of every hit that gets through (features/defense.lua)
     maxHealthFactor = 1,
     regenPerSecond = 0,         -- health points per second (0 = off)
     regenDelay = 2,             -- seconds without a hit before it starts

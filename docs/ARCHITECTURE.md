@@ -36,8 +36,9 @@ main.lua ──► settings.lua ─────────────┐
 
 | Module | Cheats |
 |---|---|
-| `health.lua` | God Mode, Infinite Stamina / Nephtoglobin, Fall Damage, Max Health, Damage Taken (fallback), Health Regeneration |
-| `damage.lua` | Hooks on the game's damage functions: incoming (God Mode, Damage Taken) and outgoing (One-Hit Kills, Damage Multiplier) |
+| `health.lua` | God Mode, Infinite Stamina / Nephtoglobin, Fall Damage, Max Health, Health Regeneration |
+| `defense.lua` | Damage Taken: raises William's resistance attributes, so the game's own damage math reduces every hit |
+| `damage.lua` | Hooks on the game's damage functions: incoming (God Mode) and outgoing (One-Hit Kills, Damage Multiplier) |
 | `hud.lua` | The player's HUD widget, health bar updates, health bar length under Max Health |
 | `combat.lua` | Combat state, Perfect Parry, Parry Window, Dodge Window, Kill All Enemies Nearby |
 | `movement.lua` | Movement Speed, Jump Height, Instant Sprint, Toggle Sprint, NoClip, Game Speed |

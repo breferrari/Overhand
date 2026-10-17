@@ -26,7 +26,7 @@ Up/Down select   Left/Right change   Enter use   Q/E tab   F6 close
 
 | Tab | Cheats |
 |---|---|
-| **Survival** | God Mode · Infinite Stamina (optionally only out of combat) · Infinite Nephtoglobin · Fall Damage 100–0 % · Damage Taken 100–10 % · Max Health up to 5x (the health bar keeps its length) · Health Regeneration 1–50 HP/s with a delay after hits, a heal-up-to limit and an out-of-combat option |
+| **Survival** | God Mode · Infinite Stamina (optionally only out of combat) · Infinite Nephtoglobin · Fall Damage 100–0 % · Damage Taken 100–10 % (through the game's own resistances) · Max Health up to 5x (the health bar keeps its length) · Health Regeneration 1–50 HP/s with a delay after hits, a heal-up-to limit and an out-of-combat option |
 | **Movement** | NoClip (Space up, Ctrl down) · Movement Speed up to 5x · Jump Height up to 10x · Game Speed 0.25–2x · Toggle Sprint for keyboard · Instant Sprint · **Teleport**: 5 saved positions per area |
 | **Combat** | One-Hit Kills · Damage Multiplier up to 10x · Every Block Is A Perfect Parry · Parry Window 0.5–6x · Dodge Window 0.5–4x · Kill All Enemies Nearby (60 m) |
 | **Items** | Infinite Ammo · Infinite Healing Flasks · Infinite Consumables · Infinite Buffs (potions, coatings, pistol boosts) · No Item Cooldowns · Keep Catalysts On Death · No Ability Costs · Refill Everything |
@@ -100,7 +100,7 @@ The smoke test compiles every file with Lua 5.4 (what UE4SS embeds), checks the 
 ## Credits
 
 - Parts of the cheat logic come from **Valor Mortis Cheat Menu** 1.3.2 by BryanHudson (MIT).
-- Health Regeneration (healing through the game's attribute system, the combat check) and the menu style follow **AeonGreyh**'s Passive Health Regen, reimplemented here.
+- Health Regeneration (healing through the game's attribute system, the combat check), Damage Taken (raising resistances) and the menu style follow **AeonGreyh**'s Passive Health Regen and Defense Multiplier, reimplemented here.
 - [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) by the UE4SS-RE team (MIT).
 
 ## License

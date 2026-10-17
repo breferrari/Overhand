@@ -137,10 +137,11 @@ function Unreal.OnWorldReset(callback)
     worldResetCallbacks[#worldResetCallbacks + 1] = callback
 end
 
+-- Callbacks run first, so they can still reach cached objects that survive the reset.
 function Unreal.ResetWorld()
+    for _, callback in ipairs(worldResetCallbacks) do pcall(callback) end
     cachedObjects = {}
     nextSearchAt = {}
-    for _, callback in ipairs(worldResetCallbacks) do pcall(callback) end
 end
 
 return Unreal
