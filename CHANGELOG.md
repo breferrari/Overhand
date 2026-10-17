@@ -20,6 +20,11 @@
   - `Unreal.FindRanked` replaces the HUD's two lookups (one search, William's own HUD preferred).
   - The damage hooks are their own feature entry.
 - **Menu key** is F5.
+- **Second code review fixes:**
+  - Max Health scales health from the max health we last wrote (or the one before switching on), so a level-up is no free heal.
+  - Heals are verified every time and written directly only when that heal did not land; nothing is latched for good.
+  - The saved-values check gives up after 10 s; `FindRanked` searches for a better candidate only every 30 s once it has a usable one.
+  - Damage Taken logs when no resistance is readable; the health bar learns its scale only while max health is settled; the damage repair message survives a retry.
 - **Fixes along the way:** every saved teleport slot is kept on save; settings write whole numbers without ".0".
 - **Code review fixes:**
   - A world reset hands back vanilla values on objects that survive it (Override:release), so Movement Speed etc. can no longer compound after a restart.
@@ -27,7 +32,7 @@
   - The HUD lookup prefers the widget William owns over one with an unknown owner.
   - The shared effect list is re-read after Dodge Window removes an effect.
   - Regeneration checks that health actually rose and otherwise writes it directly.
-  - The cheats wait (up to 10 s) until the saved-values check could read the attribute sets.
+  - The saved-values check retries until the attribute sets are readable (gives up after 10 s).
   - Every feature tick runs guarded on its own.
   - No Ability Costs retries quietly without a cheat manager.
 

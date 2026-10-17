@@ -16,27 +16,22 @@ local try, isValid = Unreal.Try, Unreal.IsValid
 
 -- ---------------------------------------------------------------------------
 -- Healing
--- A heal path asks the game to heal (so its HUD and effects follow). The first heal checks that
--- health really rose; if it did not, that path writes health directly from then on and tells the
--- health bar. Each path decides once and logs its choice once.
+-- A heal path asks the game to heal (so its HUD and effects follow). Every heal checks that health
+-- really rose; a heal that did not land is written directly instead, and the health bar is told.
+-- Nothing is decided for good: the game's path is tried again on the next heal.
 -- ---------------------------------------------------------------------------
 
--- path: { label, apply = function(healthSet, amount) -> true when the call went through, method }
+-- path: { label, apply = function(healthSet, amount) -> true when the call went through }
 local function addHealth(path, healthSet, health, maxHealth, amount)
     if amount <= 0.01 then return end
-    if path.method ~= "direct" and path.apply(healthSet, amount) then
-        if path.method == "game" then return end
+    if path.apply(healthSet, amount) then
         local healthAfter = Game.GetAttribute(healthSet, "Health")
         if healthAfter and healthAfter >= health + amount * 0.5 then
-            path.method = "game"
-            Log.Info(path.label .. ": healing through the game")
+            Log.Limited(path.label .. " game", 1, path.label .. ": healing through the game")
             return
         end
     end
-    if path.method ~= "direct" then
-        path.method = "direct"
-        Log.Info(path.label .. ": the game's heal did not apply, writing health directly")
-    end
+    Log.Limited(path.label .. " direct", 3, path.label .. ": the game's heal did not apply, writing health directly")
     local newHealth = math.min(maxHealth, health + amount)
     Game.SetAttribute(healthSet, "Health", newHealth)
     Hud.UpdateHealthBar(newHealth, maxHealth)
@@ -117,15 +112,19 @@ end
 
 -- ---------------------------------------------------------------------------
 -- Max Health: MaxHealth times the factor (a saved attribute, so through the ledger). Current health
--- moves with every change of max health so the bar keeps its fill; a save that already holds our
--- value (the ledger knows it) changes nothing and gets no free heal.
+-- moves with our own changes of max health, so the bar keeps its fill: it is scaled from the max
+-- health we wrote last (or, when switching on, the max health just before) to the one we write now.
+-- A change the game makes in between (a level-up) is not ours to scale. After a load the save may
+-- already hold our value; then the switch-on write changes nothing and gives no free heal.
 -- ---------------------------------------------------------------------------
 
 local maxHealthOverride = Override.new()
+local lastWrittenMaxHealth = nil
 
 local function applyMaxHealth()
     local factor = State.settings.maxHealthFactor or 1
-    if factor == 1 and not maxHealthOverride:isActive() then return end
+    local wasActive = maxHealthOverride:isActive()
+    if factor == 1 and not wasActive then return end
     local healthSet, health, maxHealthBefore = Game.PlayerHealth()
     if not healthSet then return end
     if factor ~= 1 then
@@ -134,10 +133,13 @@ local function applyMaxHealth()
         maxHealthOverride:restore()
     end
     local maxHealthAfter = Game.GetAttribute(healthSet, "MaxHealth")
-    if maxHealthAfter and health > 0 and not Override.NearlyEqual(maxHealthAfter, maxHealthBefore) then
-        local scaledHealth = math.min(health * maxHealthAfter / maxHealthBefore, maxHealthAfter)
+    if not maxHealthAfter then return end
+    local previous = wasActive and lastWrittenMaxHealth or maxHealthBefore
+    lastWrittenMaxHealth = factor ~= 1 and maxHealthAfter or nil
+    if previous and health > 0 and not Override.NearlyEqual(maxHealthAfter, previous) then
+        local scaledHealth = math.min(health * maxHealthAfter / previous, maxHealthAfter)
         Game.SetAttribute(healthSet, "Health", scaledHealth)
-        Log.Debug(string.format("max health %.0f -> %.0f, health %.0f -> %.0f", maxHealthBefore, maxHealthAfter, health, scaledHealth))
+        Log.Debug(string.format("max health %.0f -> %.0f, health %.0f -> %.0f", previous, maxHealthAfter, health, scaledHealth))
     end
 end
 
@@ -239,6 +241,7 @@ end
 
 Unreal.OnWorldReset(function()
     maxHealthOverride:release()
+    lastWrittenMaxHealth = nil
     regen.lastHealth, regen.lastStepAt = nil, nil
     -- fallCurve is not reset: the curve is a game asset that outlives the world, and resetting would
     -- take our scaled values for the originals. A different curve is noticed by its address.

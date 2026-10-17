@@ -31,15 +31,20 @@ local DAMAGE_MULTIPLIERS = {
     { set = "Ranged", className = "RangedAttributeSet", attribute = "RangedDamageMultiplier" },
 }
 
--- Returns false while a damage attribute set is not readable yet.
+-- Returns false (and repairs nothing) while a damage attribute set is not readable yet.
 local function repairDamageMultipliers()
-    local repaired = 0
-    for _, multiplier in ipairs(DAMAGE_MULTIPLIERS) do
+    local found = {}
+    for index, multiplier in ipairs(DAMAGE_MULTIPLIERS) do
         local set = Game.AttributeSet(multiplier.set)
         local base = set and Game.GetBaseValue(set, multiplier.attribute)
         if not base then return false end
+        found[index] = { set = set, base = base }
+    end
+    local repaired = 0
+    for index, multiplier in ipairs(DAMAGE_MULTIPLIERS) do
+        local set, base = found[index].set, found[index].base
         local default = defaultBaseValue(multiplier.className, multiplier.attribute)
-        if base and base >= default * 1.4 then
+        if base >= default * 1.4 then
             Game.SetBaseValueKeepModifiers(set, multiplier.attribute, default)
             Log.Info("repaired " .. multiplier.attribute .. ": " .. base .. " -> " .. default)
             repaired = repaired + 1

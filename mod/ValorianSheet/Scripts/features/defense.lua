@@ -40,9 +40,17 @@ function Defense.Tick()
     local healthSet = Game.AttributeSet("Health")
     if not healthSet then return end
     appliedShare = share
-    for _, name in ipairs(RESISTANCES) do resistanceOverride:currentValue(healthSet, name, scaled) end
-    if applied.share ~= share then
-        Log.Info(string.format("damage taken: %d%% (resistances raised)", math.floor(share * 100 + 0.5)))
+    local readable = 0
+    for _, name in ipairs(RESISTANCES) do
+        if Game.GetAttribute(healthSet, name) then
+            readable = readable + 1
+            resistanceOverride:currentValue(healthSet, name, scaled)
+        end
+    end
+    if readable == 0 then
+        Log.Limited("damage taken unreadable", 1, "damage taken: no resistance attribute readable on the health set, the cheat cannot work")
+    elseif applied.share ~= share then
+        Log.Info(string.format("damage taken: %d%% (%d resistances raised)", math.floor(share * 100 + 0.5), readable))
     end
     applied.share, applied.effectCount, applied.nextAt = share, effectCount, os.clock() + REAPPLY_SECONDS
 end

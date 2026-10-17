@@ -21,7 +21,8 @@ local SavedValues = require("features.saved_values")
 
 local Cheats = {}
 
-local SETTLE_SECONDS = 2   -- after William appears, before anything is applied
+local SETTLE_SECONDS = 2           -- after William appears, before anything is applied
+local SAVED_VALUES_GIVE_UP = 10     -- seconds of retrying before the saved-values check gives up
 
 local FEATURES = {
     { name = "dev actions", tick = DevActions.Tick },
@@ -38,6 +39,7 @@ local session = {
     readyAt = 0,                  -- nothing is applied before then (the world is still loading)
     playerAddress = nil,          -- the William the per-world state belongs to
     savedValuesChecked = false,   -- retried every tick until the attribute sets were readable
+    savedValuesGiveUpAt = 0,
     brokenWeaponsChecked = false,
 }
 
@@ -61,6 +63,7 @@ function Cheats.Tick()
         Unreal.ResetWorld()
         session.playerAddress = address
         session.readyAt = os.clock() + SETTLE_SECONDS
+        session.savedValuesGiveUpAt = session.readyAt + SAVED_VALUES_GIVE_UP
         State.status = "Ready"
         return
     end
@@ -68,6 +71,10 @@ function Cheats.Tick()
     if not session.savedValuesChecked then
         local ok, allChecked = Log.Guarded("check saved values", SavedValues.Check)
         session.savedValuesChecked = ok and allChecked == true
+        if not session.savedValuesChecked and os.clock() >= session.savedValuesGiveUpAt then
+            Log.Info("saved values: attribute sets not readable, check skipped for this world")
+            session.savedValuesChecked = true
+        end
     end
     if not session.brokenWeaponsChecked then
         session.brokenWeaponsChecked = Unreal.Try(Give.RemoveBrokenWeapons) == true

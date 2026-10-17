@@ -2,8 +2,9 @@
 -- The player's HUD: telling it about values written directly (health, ammo, buff counters), and
 -- keeping the health bar at its normal length while Max Health is raised.
 --
--- The HUD widget (WBP_PlayerVitals) is a cached lookup. After loading a save the old HUD can stay
--- valid for a while next to the new one, so the kept widget is re-checked by its owner once a second.
+-- The HUD widget (WBP_PlayerVitals) is a ranked lookup (Unreal.FindRanked): after loading a save the
+-- old HUD can stay valid for a while next to the new one, so the kept widget is re-ranked by its
+-- owner on every use and William's own HUD wins.
 
 local Unreal = require("lib.unreal")
 local Log = require("lib.log")
@@ -115,8 +116,11 @@ function Hud.KeepHealthBarLength()
     if widthChanged and not isOurs then
         if not freshWidget then logLayout("game changed the bar", width) end
         healthBar.widthWeSet = nil
+        -- only while max health is settled (vanilla, or our value in place), not mid-change
+        local recorded = State.attributeLedger.MaxHealth
+        local settled = factor == 1 or (recorded and math.abs(baseMaxHealth - recorded.written) <= 0.01)
         local pixelsPerHealth = width / maxHealth
-        if pixelsPerHealth > 0.05 and pixelsPerHealth < 50 then healthBar.pixelsPerHealth = pixelsPerHealth end
+        if settled and pixelsPerHealth > 0.05 and pixelsPerHealth < 50 then healthBar.pixelsPerHealth = pixelsPerHealth end
     end
 
     local function setWidth(newWidth, reason)

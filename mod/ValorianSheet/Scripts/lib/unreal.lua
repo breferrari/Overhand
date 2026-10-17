@@ -121,13 +121,15 @@ function Unreal.FindAllCached(key, className, retrySeconds)
 end
 
 -- The best live object of className by rank(object) (a number, higher is better; nil rejects it),
--- kept under key. The kept object is ranked again on every call (rank should be cheap); while it is
--- below bestRank, or once it is rejected, a new search runs at most every retrySeconds.
+-- kept under key. The kept object is ranked again on every call (rank should be cheap). With nothing
+-- usable kept, a search runs at most every retrySeconds; with a usable object below bestRank, only
+-- every UPGRADE_SEARCH_SECONDS (a better one may never exist).
+local UPGRADE_SEARCH_SECONDS = 30
 function Unreal.FindRanked(key, className, retrySeconds, rank, bestRank)
     local kept = cachedObjects[key]
     local keptRank = kept and Unreal.IsValid(kept.object) and rank(kept.object)
     if keptRank and keptRank >= bestRank then return kept.object end
-    if searchAllowed(key, retrySeconds) then
+    if searchAllowed(key, keptRank and UPGRADE_SEARCH_SECONDS or retrySeconds) then
         local bestObject, bestFound = nil, nil
         for _, object in ipairs(Unreal.FindAllLive(className)) do
             local objectRank = rank(object)
