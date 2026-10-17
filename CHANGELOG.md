@@ -3,6 +3,7 @@
 ## 1.2.0 (2026-10-17)
 
 - **Controller support:** L3 + R3 opens and closes the menu; D-pad selects and changes (held: repeats), A uses, B closes, LB / RB switch tabs. The first 20 controller commands are logged. Key reading is shared (`Game.IsKeyDown`, also used by NoClip).
+- **Controller fix (tested):** in UI-only input mode the game stops processing controller buttons, so the menu could open but not be navigated or closed. Opened with L3 + R3, the menu now uses game-and-UI input mode (William's own input stays disabled); opened with F5 it keeps UI-only mode.
 
 ## 1.1.0 (2026-10-17)
 

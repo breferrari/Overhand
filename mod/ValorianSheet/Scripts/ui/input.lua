@@ -58,7 +58,7 @@ end
 function Input.PollController(menuOpen)
     -- L3 + R3: L3 is read first, R3 only while L3 is held (one call per tick while closed)
     local toggleDown = Game.IsKeyDown(TOGGLE_BUTTONS[1]) and Game.IsKeyDown(TOGGLE_BUTTONS[2])
-    if toggleDown and not toggleHeld then queueFromController("toggle") end
+    if toggleDown and not toggleHeld then queueFromController("toggleWithController") end
     toggleHeld = toggleDown
     if not menuOpen then
         held = {}
@@ -82,23 +82,37 @@ function Input.PollController(menuOpen)
 end
 
 -- ---------------------------------------------------------------------------
--- While the menu is open the game gets no input: the player does not move or look around, game
--- menus do not open on Esc, and the mouse cursor is shown (for the sliders).
+-- While the menu is open William does not move, look around or act: his own input is disabled and
+-- the controller ignores move and look input.
+--   Opened with the keyboard: UI-only input mode with the mouse cursor (for the sliders); game
+--     menus do not open on Esc.
+--   Opened with the controller: game-and-UI input mode, because in UI-only mode the game stops
+--     processing controller buttons and the menu could not read them (tested in game). The game's
+--     own controller actions (Start / pause) still work; a game menu that opens closes ours.
 -- ---------------------------------------------------------------------------
 
-local blocked = nil   -- { player, controller, uiInputMode }
+local blocked = nil   -- { player, controller, changedInputMode }
 
-function Input.BlockGame(controller)
+local function setUiOnly(widgetLibrary, controller)
+    return try(function() widgetLibrary:SetInputMode_UIOnlyEx(controller, nil, 0, true) return true end)
+        or try(function() widgetLibrary:SetInputMode_UIOnlyEx(controller, nil, 0) return true end)
+end
+
+local function setGameAndUi(widgetLibrary, controller)
+    return try(function() widgetLibrary:SetInputMode_GameAndUIEx(controller, nil, 0, false, false) return true end)
+        or try(function() widgetLibrary:SetInputMode_GameAndUIEx(controller, nil, 0, false) return true end)
+end
+
+function Input.BlockGame(controller, withController)
     if blocked or not isValid(controller) then return end
     local player = Game.Player()
     if player then try(function() player:DisableInput(controller) end) end
     try(function() controller:SetIgnoreLookInput(true) end)
     try(function() controller:SetIgnoreMoveInput(true) end)
-    try(function() controller.bShowMouseCursor = true end)
+    try(function() controller.bShowMouseCursor = not withController end)
     local widgetLibrary = Game.WidgetLibrary()
-    local uiInputMode = try(function() widgetLibrary:SetInputMode_UIOnlyEx(controller, nil, 0, true) return true end)
-        or try(function() widgetLibrary:SetInputMode_UIOnlyEx(controller, nil, 0) return true end)
-    blocked = { player = player, controller = controller, uiInputMode = uiInputMode == true }
+    local changed = withController and setGameAndUi(widgetLibrary, controller) or setUiOnly(widgetLibrary, controller)
+    blocked = { player = player, controller = controller, changedInputMode = changed == true }
 end
 
 -- handOverTo: a game menu that opened while ours was open; it gets the cursor and focus.
@@ -118,7 +132,7 @@ function Input.UnblockGame(handOverTo)
         return
     end
     try(function() controller.bShowMouseCursor = false end)
-    if state.uiInputMode then
+    if state.changedInputMode then
         local ok = try(function() widgetLibrary:SetInputMode_GameOnly(controller, true) return true end)
         if not ok then try(function() widgetLibrary:SetInputMode_GameOnly(controller) end) end
     end

@@ -94,7 +94,7 @@ def run_mod(mod_folder: pathlib.Path, walk_menu: bool = True) -> list[str]:
     undefined = sorted({str(mock.undefinedGlobals[i]) for i in range(1, len(mock.undefinedGlobals) + 1)})
     if undefined:
         problems.append("undefined globals read: " + ", ".join(undefined))
-    if walk_menu and "controller: toggle" not in log:
+    if walk_menu and "controller: toggleWithController" not in log:
         problems.append("controller: L3 + R3 did not open the menu")
     if walk_menu and "controller: close" not in log:
         problems.append("controller: B did not close the menu")

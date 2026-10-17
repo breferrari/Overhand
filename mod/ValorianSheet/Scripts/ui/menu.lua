@@ -430,7 +430,8 @@ end
 -- Open / close
 -- ---------------------------------------------------------------------------
 
-local function open()
+-- withController: opened with L3 + R3 (see Input.BlockGame for why that changes the input mode).
+local function open(withController)
     local controller = Game.Controller()
     if not controller then
         Log.Info("menu: no player controller yet")
@@ -448,7 +449,7 @@ local function open()
     end
     Widgets.SetVisible(view.widgets.root, true)
     applyScale(controller)
-    Input.BlockGame(controller)
+    Input.BlockGame(controller, withController)
     view.open = true
     view.pendingConfirm = nil
     view.nextGameMenuCheckAt = os.clock() + GAME_MENU_CHECK_INTERVAL
@@ -476,8 +477,8 @@ local COMMANDS = {
 }
 
 local function handleCommand(command)
-    if command == "toggle" then
-        if view.open then close() else open() end
+    if command == "toggle" or command == "toggleWithController" then
+        if view.open then close() else open(command == "toggleWithController") end
         return
     end
     if not view.open then return end
